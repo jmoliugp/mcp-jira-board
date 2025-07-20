@@ -11,4 +11,4 @@ if (require.main === module) {
   main();
 }
 
-export { greet }; 
+export { greet };
