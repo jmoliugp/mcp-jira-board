@@ -1,6 +1,6 @@
 {
   "mcpServers": {
-    "demo-server": {
+    "jira-mcp-server": {
       "command": "node",
       "args": ["dist/mcps/index.js"],
       "env": {}

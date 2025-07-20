@@ -2,7 +2,22 @@
 
 ## Project Overview
 
-FILL_IT
+This is an MCP (Model Context Protocol) server that provides Jira board management functionality. The project allows users to create, list, and manage Jira boards through MCP tools, enabling AI assistants to interact with Jira programmatically.
+
+### Core Functionality
+
+- **Jira Board Management**: Create scrum/kanban boards, list existing boards, get board details
+- **Project Management**: List and manage Jira projects
+- **Filter Management**: List and manage Jira filters for board creation
+- **MCP Integration**: Expose all Jira functionality as MCP tools for AI assistants
+
+### Technical Stack
+
+- **TypeScript**: Strict typing and modern JavaScript features
+- **MCP SDK**: Model Context Protocol for AI tool integration
+- **Axios**: HTTP client for Jira REST API calls
+- **Performance Monitoring**: Execution timing and logging
+- **Error Handling**: Comprehensive error handling and recovery
 
 ## Code Style & Standards
 
