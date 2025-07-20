@@ -1,6 +1,7 @@
 import { performance } from 'perf_hooks';
 
-import { Logger } from './utils/log';
+import { Logger } from './utils/log.js';
+import { startServer } from './mcps/index.js';
 
 const log = new Logger('Main');
 
@@ -8,6 +9,9 @@ const startWorkFlow = async (): Promise<void> => {
   const start = performance.now();
 
   log.info(`🚀 Jira's MCP server started!`);
+
+  // Start the MCP server
+  await startServer();
 
   const end = performance.now();
   log.info(`⏱️  Total execution time: ${(end - start).toFixed(2)}ms`);
