@@ -1,13 +1,14 @@
 import { McpServer, ResourceTemplate } from '@modelcontextprotocol/sdk/server/mcp.js';
 import { StdioServerTransport } from '@modelcontextprotocol/sdk/server/stdio.js';
 import { Logger } from '../utils/log';
+
 import z from 'zod';
 
 const log = new Logger('MCP Server');
 
 // Create an MCP server
 const server = new McpServer({
-  name: 'demo-server',
+  name: 'jira-mcp-server',
   version: '1.0.0',
 });
 
