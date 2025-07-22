@@ -6,6 +6,15 @@ export const jiraApiEndpoint = {
     moveIssuesToBacklog: '/rest/agile/1.0/backlog/issue',
     moveIssuesToBacklogForBoard: '/rest/agile/1.0/backlog/%s/issue',
   },
+  // --- Board endpoints ---
+  board: {
+    getAllBoards: '/rest/agile/1.0/board',
+    createBoard: '/rest/agile/1.0/board',
+    getBoardById: '/rest/agile/1.0/board/%s',
+    deleteBoard: '/rest/agile/1.0/board/%s',
+    getBoardByFilterId: '/rest/agile/1.0/board/filter/%s',
+    getBoardBacklog: '/rest/agile/1.0/board/%s/backlog',
+  },
 };
 
 export const axiosClient = axios.create({
