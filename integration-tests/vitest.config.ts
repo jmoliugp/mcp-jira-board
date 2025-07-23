@@ -19,11 +19,12 @@ export default defineConfig({
     // globalSetup: './setup.ts',
 
     // Test reporters
-    reporters: ['verbose', 'json'],
+    reporters: ['verbose', 'json', 'html'],
 
     // Output file for JSON reporter
     outputFile: {
-      json: './integration-tests-results.json',
+      json: './integration-tests/output/integration-tests-results.json',
+      html: './integration-tests/output/integration-tests-report.html',
     },
 
     // Coverage (optional)
@@ -31,6 +32,7 @@ export default defineConfig({
       provider: 'v8',
       reporter: ['text', 'json', 'html'],
       exclude: ['node_modules/', 'src/**/*.test.ts', 'integration-tests/**/*.test.ts'],
+      reportsDirectory: './integration-tests/output/coverage',
     },
 
     // Log level

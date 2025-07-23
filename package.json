@@ -16,7 +16,9 @@
     "type-check": "tsc --noEmit",
     "test:unit": "vitest",
     "test:integration": "vitest --config integration-tests/vitest.config.ts",
-    "test:all": "pnpm test:unit && pnpm test:integration"
+    "test:all": "pnpm test:unit && pnpm test:integration",
+    "test:integration:report": "tsx integration-tests/serve-report.ts",
+    "test:integration:coverage": "open integration-tests/output/coverage/index.html"
   },
   "keywords": [
     "typescript",
@@ -29,6 +31,7 @@
     "@typescript-eslint/eslint-plugin": "^6.19.0",
     "@typescript-eslint/parser": "^6.19.0",
     "@vitest/coverage-v8": "^3.2.4",
+    "@vitest/ui": "3.2.4",
     "eslint": "^8.56.0",
     "eslint-config-prettier": "^9.1.0",
     "eslint-plugin-import": "^2.29.1",
