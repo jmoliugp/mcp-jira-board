@@ -123,3 +123,7 @@ This is an MCP (Model Context Protocol) server that provides Jira board manageme
 - **Comprehensive logging** - track every operation
 
 Remember: This project prioritizes clean, maintainable code with proper TypeScript typing, comprehensive error handling, and structured logging. Always test scrapers against live sites, handle layout changes gracefully, and maintain consistent logging patterns for debugging and monitoring.
+
+// Project-Specific Code Style Preferences
+// --------------------------------------
+Separate code blocks with visible blank lines (double line breaks) instead of comment dividers. Do not use comment lines for separation. This improves readability and is the preferred style for this project.
