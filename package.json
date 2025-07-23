@@ -14,7 +14,9 @@
     "format:check": "prettier --check \"src/**/*.ts\"",
     "clean": "rm -rf dist",
     "type-check": "tsc --noEmit",
-    "test": "vitest"
+    "test:unit": "vitest",
+    "test:integration": "vitest --config integration-tests/vitest.config.ts",
+    "test:all": "pnpm test:unit && pnpm test:integration"
   },
   "keywords": [
     "typescript",
