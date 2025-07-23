@@ -18,7 +18,9 @@
     "test:integration": "vitest --config integration-tests/vitest.config.ts",
     "test:all": "pnpm test:unit && pnpm test:integration",
     "test:integration:report": "tsx integration-tests/serve-report.ts",
-    "test:integration:coverage": "open integration-tests/output/coverage/index.html"
+    "test:integration:coverage": "open integration-tests/output/coverage/index.html",
+    "mcp:test": "tsx scripts/test-mcp-server.ts",
+    "mcp:start": "tsx src/mcps/index.ts"
   },
   "keywords": [
     "typescript",
