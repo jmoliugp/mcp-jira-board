@@ -126,4 +126,4 @@ Remember: This project prioritizes clean, maintainable code with proper TypeScri
 
 // Project-Specific Code Style Preferences
 // --------------------------------------
-// Separate certain code blocks with lines (e.g., comment dividers) to improve readability. This is a user preference for code style and should be followed in future code changes.
+Separate code blocks with visible blank lines (double line breaks) instead of comment dividers. Do not use comment lines for separation. This improves readability and is the preferred style for this project.
