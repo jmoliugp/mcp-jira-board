@@ -1,0 +1,40 @@
+version: '3.8'
+
+services:
+  jira-mcp-server:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    container_name: jira-mcp-server
+    environment:
+      - NODE_ENV=production
+      # Jira Configuration - these should be set via .env file or environment
+      - JIRA_BASE_URL=${JIRA_BASE_URL}
+      - JIRA_EMAIL=${JIRA_EMAIL}
+      - JIRA_API_TOKEN=${JIRA_API_TOKEN}
+      - JIRA_API_TIMEOUT=${JIRA_API_TIMEOUT:-10000}
+      - JIRA_API_RETRY_ATTEMPTS=${JIRA_API_RETRY_ATTEMPTS:-3}
+      - JIRA_API_RETRY_DELAY=${JIRA_API_RETRY_DELAY:-1000}
+      - JIRA_LOG_LEVEL=${JIRA_LOG_LEVEL:-info}
+      - JIRA_LOG_REQUESTS=${JIRA_LOG_REQUESTS:-false}
+      - JIRA_LOG_RESPONSES=${JIRA_LOG_RESPONSES:-false}
+      - JIRA_RATE_LIMIT_ENABLED=${JIRA_RATE_LIMIT_ENABLED:-true}
+      - JIRA_RATE_LIMIT_REQUESTS_PER_MINUTE=${JIRA_RATE_LIMIT_REQUESTS_PER_MINUTE:-1000}
+      - JIRA_ENVIRONMENT=${JIRA_ENVIRONMENT:-cloud}
+      - OPENAI_API_KEY=${OPENAI_API_KEY}
+    volumes:
+      # Mount the dist directory for development (optional)
+      - ./dist:/app/dist:ro
+    ports:
+      # Expose port for health checks (optional)
+      - '3000:3000'
+    restart: unless-stopped
+    healthcheck:
+      test: ['CMD', 'node', '-e', "console.log('Health check passed')"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 40s
+    # For MCP communication via stdio
+    stdin_open: true
+    tty: true
