@@ -696,3 +696,169 @@ describe('Issue Service', () => {
     });
   });
 });
+
+describe('Issue Update Functions', () => {
+  describe('getIssueTransitions', () => {
+    it('should get issue transitions successfully', async () => {
+      const mockTransitions = {
+        expand: 'transitions',
+        transitions: [
+          {
+            id: '21',
+            name: 'In Progress',
+            to: {
+              id: '3',
+              name: 'In Progress',
+              statusCategory: {
+                id: 4,
+                key: 'indeterminate',
+                colorName: 'yellow',
+              },
+            },
+            hasScreen: false,
+            isGlobal: true,
+            isInitial: false,
+            isConditional: false,
+            isLooped: false,
+          },
+        ],
+      };
+
+      mockedAxiosClient.get.mockResolvedValueOnce({ data: mockTransitions });
+
+      const result = await issue.getIssueTransitions('TEST-123');
+
+      expect(result).toEqual(mockTransitions);
+      expect(mockedAxiosClient.get).toHaveBeenCalledWith(
+        'https://test.atlassian.net/rest/api/3/issue/TEST-123/transitions'
+      );
+    });
+
+    it('should handle errors properly', async () => {
+      const error = new Error('API Error') as AxiosError;
+      error.response = { status: 404, data: { errorMessages: ['Issue not found'] } } as any;
+      mockedAxiosClient.get.mockRejectedValueOnce(error);
+
+      await expect(issue.getIssueTransitions('INVALID-123')).rejects.toThrow(
+        'Issue not found for getIssueTransitions.'
+      );
+    });
+  });
+
+  describe('updateIssue', () => {
+    it('should update issue fields successfully', async () => {
+      const mockResponse = {
+        id: '12345',
+        key: 'TEST-123',
+        self: 'https://test.atlassian.net/rest/api/3/issue/12345',
+      };
+
+      const updateInput = {
+        fields: {
+          summary: 'Updated Summary',
+          assignee: {
+            accountId: 'user123',
+          },
+          priority: {
+            id: '2',
+          },
+        },
+      };
+
+      mockedAxiosClient.put.mockResolvedValueOnce({ data: mockResponse });
+
+      const result = await issue.updateIssue('TEST-123', updateInput);
+
+      expect(result).toEqual(mockResponse);
+      expect(mockedAxiosClient.put).toHaveBeenCalledWith(
+        'https://test.atlassian.net/rest/api/3/issue/TEST-123',
+        updateInput
+      );
+    });
+
+    it('should update issue status with transition', async () => {
+      const mockResponse = {
+        id: '12345',
+        key: 'TEST-123',
+        self: 'https://test.atlassian.net/rest/api/3/issue/12345',
+      };
+
+      const updateInput = {
+        transition: {
+          id: '21',
+        },
+        update: {
+          comment: [
+            {
+              add: {
+                body: {
+                  type: 'doc' as const,
+                  version: 1,
+                  content: [
+                    {
+                      type: 'paragraph' as const,
+                      content: [
+                        {
+                          type: 'text' as const,
+                          text: 'Status updated to In Progress',
+                        },
+                      ],
+                    },
+                  ],
+                },
+              },
+            },
+          ],
+        },
+      };
+
+      mockedAxiosClient.put.mockResolvedValueOnce({ data: mockResponse });
+
+      const result = await issue.updateIssue('TEST-123', updateInput);
+
+      expect(result).toEqual(mockResponse);
+    });
+
+    it('should unassign issue when assignee is null', async () => {
+      const mockResponse = {
+        id: '12345',
+        key: 'TEST-123',
+        self: 'https://test.atlassian.net/rest/api/3/issue/12345',
+      };
+
+      const updateInput = {
+        fields: {
+          assignee: null,
+        },
+      };
+
+      mockedAxiosClient.put.mockResolvedValueOnce({ data: mockResponse });
+
+      const result = await issue.updateIssue('TEST-123', updateInput);
+
+      expect(result).toEqual(mockResponse);
+    });
+
+    it('should throw error when no update operation is provided', async () => {
+      await expect(issue.updateIssue('TEST-123', {})).rejects.toThrow(
+        'At least one update operation (fields, transition, or update) is required.'
+      );
+    });
+
+    it('should handle API errors properly', async () => {
+      const error = new Error('API Error') as AxiosError;
+      error.response = { status: 400, data: { errorMessages: ['Invalid transition'] } } as any;
+      mockedAxiosClient.put.mockRejectedValueOnce(error);
+
+      const updateInput = {
+        transition: {
+          id: 'invalid',
+        },
+      };
+
+      await expect(issue.updateIssue('TEST-123', updateInput)).rejects.toThrow(
+        'Invalid input for updateIssue.'
+      );
+    });
+  });
+});

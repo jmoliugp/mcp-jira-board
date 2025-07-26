@@ -64,6 +64,7 @@ export const jiraApiEndpoint = {
     searchIssues: '/rest/api/3/search',
     getIssueTypes: '/rest/api/3/issuetype',
     getIssueType: '/rest/api/3/issuetype/%s',
+    getIssueTransitions: '/rest/api/3/issue/%s/transitions',
   },
 };
 

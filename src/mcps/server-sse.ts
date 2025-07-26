@@ -813,11 +813,11 @@ server.tool('jira_get_issue_types', {}, async () => {
 server.tool(
   'jira_get_project_issue_types',
   {
-    projectKey: z.string(),
+    projectKey: z.string().describe('The project key (e.g., "FITPULSE") to get issue types for'),
   },
   {
     description:
-      'Get available issue types for a specific project. This is more useful than jira_get_issue_types as it shows only the issue types that can be used in the specified project.',
+      'Get available issue types for a specific project. This is more useful than jira_get_issue_types as it shows only the issue types that can be used in the specified project. Use this to see what types of issues (Story, Bug, Task, etc.) are available when creating issues in a project.',
     examples: [
       {
         name: 'Get FITPULSE Project Issue Types',
@@ -864,23 +864,34 @@ server.tool(
 server.tool(
   'jira_create_user_story',
   {
-    projectKey: z.string(),
-    summary: z.string(),
-    description: z.string().optional(),
-    assigneeAccountId: z.string().optional(),
-    storyPoints: z.number().optional(),
-    labels: z.array(z.string()).optional(),
+    projectKey: z.string().describe('The project key (e.g., "FITPULSE") where to create the story'),
+    summary: z.string().describe('The story summary/title (max 255 characters)'),
+    description: z.string().optional().describe('Optional story description (supports markdown)'),
+    assigneeAccountId: z
+      .string()
+      .optional()
+      .describe(
+        'Account ID of the user to assign the story to (e.g., "557058:ce35284a-81a1-48bd-a3db-4adfcf673ad5")'
+      ),
+    storyPoints: z.number().optional().describe('Story points for estimation (e.g., 3, 5, 8, 13)'),
+    labels: z
+      .array(z.string())
+      .optional()
+      .describe('Optional labels for categorization (e.g., ["frontend", "urgent"])'),
   },
   {
     description:
-      'Create a user story in a Jira project. The function will automatically find the best available issue type (Story, Task, etc.) for the project. Note: Labels may not be supported by all projects.',
+      'Create a user story in a Jira project. The function will automatically find the best available issue type (Story, Task, etc.) for the project. If no Story type is available, it will use the first available main issue type. Note: Labels may not be supported by all projects.',
     examples: [
       {
         name: 'Create User Story for FITPULSE',
         input: {
           projectKey: 'FITPULSE',
           summary: 'Setup project structure and development environment',
-          description: 'As a developer, I need to set up the initial project structure...',
+          description:
+            'As a developer, I need to set up the initial project structure and development environment so that I can start building the application efficiently.',
+          assigneeAccountId: '557058:ce35284a-81a1-48bd-a3db-4adfcf673ad5',
+          storyPoints: 5,
           labels: ['landing-page', 'frontend'],
         },
       },
@@ -921,12 +932,23 @@ server.tool(
 server.tool(
   'jira_create_bug',
   {
-    projectKey: z.string(),
-    summary: z.string(),
-    description: z.string().optional(),
-    assigneeAccountId: z.string().optional(),
-    priority: z.string().optional(),
-    labels: z.array(z.string()).optional(),
+    projectKey: z.string().describe('The project key (e.g., "FITPULSE") where to create the bug'),
+    summary: z.string().describe('The bug summary/title (max 255 characters)'),
+    description: z.string().optional().describe('Optional bug description (supports markdown)'),
+    assigneeAccountId: z
+      .string()
+      .optional()
+      .describe(
+        'Account ID of the user to assign the bug to (e.g., "557058:ce35284a-81a1-48bd-a3db-4adfcf673ad5")'
+      ),
+    priority: z
+      .string()
+      .optional()
+      .describe('Priority ID: 1 (Highest), 2 (High), 3 (Medium), 4 (Low), 5 (Lowest)'),
+    labels: z
+      .array(z.string())
+      .optional()
+      .describe('Optional labels for categorization (e.g., ["critical", "frontend"])'),
   },
   async params => {
     log.info(`🔧 Tool 'jira_create_bug' called with params: ${JSON.stringify(params)}`);
@@ -953,20 +975,41 @@ server.tool(
 server.tool(
   'jira_create_issue',
   {
-    projectKey: z.string(),
-    summary: z.string(),
-    issueTypeId: z.string(),
-    description: z.string().optional(),
-    assigneeAccountId: z.string().optional(),
-    reporterAccountId: z.string().optional(),
-    priority: z.string().optional(),
-    labels: z.array(z.string()).optional(),
-    components: z.array(z.string()).optional(),
-    fixVersions: z.array(z.string()).optional(),
+    projectKey: z.string().describe('The project key (e.g., "FITPULSE") where to create the issue'),
+    summary: z.string().describe('The issue summary/title (max 255 characters)'),
+    issueTypeId: z
+      .string()
+      .describe(
+        'Numeric ID of the issue type (use jira_get_project_issue_types to see available IDs)'
+      ),
+    description: z.string().optional().describe('Optional issue description (supports markdown)'),
+    assigneeAccountId: z
+      .string()
+      .optional()
+      .describe(
+        'Account ID of the user to assign the issue to (e.g., "557058:ce35284a-81a1-48bd-a3db-4adfcf673ad5")'
+      ),
+    reporterAccountId: z.string().optional().describe('Account ID of the user reporting the issue'),
+    priority: z
+      .string()
+      .optional()
+      .describe('Priority ID: 1 (Highest), 2 (High), 3 (Medium), 4 (Low), 5 (Lowest)'),
+    labels: z
+      .array(z.string())
+      .optional()
+      .describe('Optional labels for categorization (e.g., ["frontend", "urgent"])'),
+    components: z
+      .array(z.string())
+      .optional()
+      .describe('Optional component IDs (use project components)'),
+    fixVersions: z
+      .array(z.string())
+      .optional()
+      .describe('Optional fix version IDs (use project versions)'),
   },
   {
     description:
-      'Create a new issue in a Jira project. Make sure to use a valid issue type ID for the specific project.',
+      'Create a new issue in a Jira project with any issue type. Use jira_get_project_issue_types first to see available issue types and their IDs for the specific project. This is more flexible than jira_create_user_story or jira_create_bug.',
     examples: [
       {
         name: 'Create a Task',
@@ -974,7 +1017,9 @@ server.tool(
           projectKey: 'FITPULSE',
           summary: 'Implement user authentication',
           issueTypeId: '10035',
-          description: 'Add user login and registration functionality',
+          description: 'Add user login and registration functionality with OAuth2 support',
+          assigneeAccountId: '557058:ce35284a-81a1-48bd-a3db-4adfcf673ad5',
+          priority: '2',
           labels: ['frontend', 'authentication'],
         },
       },
@@ -1177,6 +1222,212 @@ server.tool(
   }
 );
 
+server.tool(
+  'jira_get_issue_transitions',
+  {
+    issueKeyOrId: z
+      .string()
+      .describe('The issue key (e.g., "PROJ-123") or ID to get transitions for'),
+  },
+  {
+    description:
+      'Get all available status transitions for a specific issue. This shows what status changes are possible from the current status and provides the transition IDs needed for jira_update_issue. Use this before changing issue status to see valid options.',
+    examples: [
+      {
+        name: 'Get Transitions for FITPULSE-123',
+        input: {
+          issueKeyOrId: 'FITPULSE-123',
+        },
+      },
+    ],
+  },
+  async params => {
+    log.info(`🔧 Tool 'jira_get_issue_transitions' called with params: ${JSON.stringify(params)}`);
+    try {
+      const result = await issueService.getIssueTransitions(params['issueKeyOrId']);
+      log.info(
+        `✅ Retrieved ${result.transitions.length} transitions for issue: ${params['issueKeyOrId']}`
+      );
+      return {
+        content: [{ type: 'text', text: JSON.stringify(result, null, 2) }],
+      };
+    } catch (error) {
+      log.error(`❌ Error in jira_get_issue_transitions: ${error}`);
+      throw error;
+    }
+  }
+);
+
+server.tool(
+  'jira_update_issue',
+  {
+    issueKeyOrId: z.string().describe('The issue key (e.g., "PROJ-123") or ID to update'),
+    assigneeAccountId: z
+      .string()
+      .optional()
+      .describe(
+        'Account ID of the user to assign the issue to (e.g., "557058:ce35284a-81a1-48bd-a3db-4adfcf673ad5")'
+      ),
+    priorityId: z
+      .string()
+      .optional()
+      .describe('Priority ID: 1 (Highest), 2 (High), 3 (Medium), 4 (Low), 5 (Lowest)'),
+    transitionId: z
+      .string()
+      .optional()
+      .describe(
+        'Transition ID to change issue status (use jira_get_issue_transitions to see available options)'
+      ),
+    comment: z
+      .string()
+      .optional()
+      .describe('Comment to add to the issue (supports markdown and emojis)'),
+    summary: z.string().optional().describe('New summary/title for the issue'),
+    description: z.string().optional().describe('New description for the issue'),
+    unassign: z
+      .boolean()
+      .optional()
+      .describe('Set to true to remove the current assignee (overrides assigneeAccountId)'),
+  },
+  {
+    description:
+      'Update an existing issue with new assignee, priority, status, summary, description, and/or comments. You can update multiple fields at once. For status changes, use jira_get_issue_transitions first to see available transitions. Common priority IDs: 1=Highest, 2=High, 3=Medium, 4=Low, 5=Lowest.',
+    examples: [
+      {
+        name: 'Update Issue Assignee and Add Comment',
+        input: {
+          issueKeyOrId: 'FITPULSE-123',
+          assigneeAccountId: '557058:ce35284a-81a1-48bd-a3db-4adfcf673ad5',
+          comment: 'Assigned to development team for implementation 🚀',
+        },
+      },
+      {
+        name: 'Change Issue Status to In Progress',
+        input: {
+          issueKeyOrId: 'FITPULSE-123',
+          transitionId: '21',
+          comment: 'Starting work on this feature',
+        },
+      },
+      {
+        name: 'Update Priority and Add Comment',
+        input: {
+          issueKeyOrId: 'FITPULSE-123',
+          priorityId: '1',
+          comment: 'Escalated to highest priority due to customer impact',
+        },
+      },
+      {
+        name: 'Unassign Issue',
+        input: {
+          issueKeyOrId: 'FITPULSE-123',
+          unassign: true,
+          comment: 'Unassigned for review and reassignment',
+        },
+      },
+    ],
+  },
+  async params => {
+    log.info(`🔧 Tool 'jira_update_issue' called with params: ${JSON.stringify(params)}`);
+    try {
+      const updateInput: issueService.UpdateIssueInput = {};
+
+      // Handle fields updates
+      if (
+        params['summary'] ||
+        params['description'] ||
+        params['assigneeAccountId'] ||
+        params['priorityId'] ||
+        params['unassign']
+      ) {
+        updateInput.fields = {};
+
+        if (params['summary']) {
+          updateInput.fields.summary = params['summary'];
+        }
+
+        if (params['description']) {
+          updateInput.fields.description = params['description'];
+        }
+
+        if (params['assigneeAccountId']) {
+          updateInput.fields.assignee = {
+            accountId: params['assigneeAccountId'],
+          };
+        }
+
+        if (params['unassign']) {
+          updateInput.fields.assignee = null;
+        }
+
+        if (params['priorityId']) {
+          updateInput.fields.priority = {
+            id: params['priorityId'],
+          };
+        }
+      }
+
+      // Handle status transition
+      if (params['transitionId']) {
+        updateInput.transition = {
+          id: params['transitionId'],
+        };
+      }
+
+      // Handle comment
+      if (params['comment']) {
+        updateInput.update = {
+          comment: [
+            {
+              add: {
+                body: params['comment'],
+              },
+            },
+          ],
+        };
+      }
+
+      log.info(`📤 Updating issue with: ${JSON.stringify(updateInput, null, 2)}`);
+      const result = await issueService.updateIssue(params['issueKeyOrId'], updateInput);
+      log.info(`✅ Updated issue: ${result.key}`);
+
+      return {
+        content: [{ type: 'text', text: JSON.stringify(result, null, 2) }],
+      };
+    } catch (error) {
+      log.error(`❌ Error in jira_update_issue: ${error}`);
+
+      // Enhanced error handling for common update scenarios
+      if (error instanceof Error) {
+        log.error(`❌ Error message: ${error.message}`);
+
+        // Check if it's a transition error
+        if (error.message.includes('transition') || error.message.includes('status')) {
+          log.error(
+            `❌ Invalid transition ID. Use jira_get_issue_transitions to see available transitions.`
+          );
+        }
+
+        // Check if it's an assignee error
+        if (error.message.includes('assignee') || error.message.includes('user')) {
+          log.error(
+            `❌ Invalid assignee. Make sure the user account ID is correct and the user has access to the project.`
+          );
+        }
+
+        // Check if it's a priority error
+        if (error.message.includes('priority')) {
+          log.error(
+            `❌ Invalid priority ID. Common priority IDs: 1 (Highest), 2 (High), 3 (Medium), 4 (Low), 5 (Lowest)`
+          );
+        }
+      }
+
+      throw error;
+    }
+  }
+);
+
 // Board Resources
 
 server.registerResource(
@@ -1290,7 +1541,7 @@ async function handleSSE(req: http.IncomingMessage, res: http.ServerResponse, ur
     await server.connect(transport);
     log.info(`✅ MCP server connected to SSE transport: ${transport.sessionId}`);
     log.info(
-      `📋 Available tools: jira_get_all_boards, jira_create_board, jira_get_board_by_id, jira_delete_board, jira_get_board_backlog, jira_get_board_epics, jira_get_board_sprints, jira_get_board_issues, jira_move_issues_to_board, jira_get_my_filters, jira_get_favourite_filters, jira_search_filters, jira_move_issues_to_backlog, jira_move_issues_to_backlog_for_board, jira_create_project, jira_get_all_projects, jira_get_project, jira_check_project_exists, jira_get_current_user, jira_update_project, jira_delete_project, jira_create_project_with_board, jira_get_issue_types, jira_get_project_issue_types, jira_create_user_story, jira_create_bug, jira_create_issue, jira_get_issue, jira_search_issues, jira_delete_issue`
+      `📋 Available tools: jira_get_all_boards, jira_create_board, jira_get_board_by_id, jira_delete_board, jira_get_board_backlog, jira_get_board_epics, jira_get_board_sprints, jira_get_board_issues, jira_move_issues_to_board, jira_get_my_filters, jira_get_favourite_filters, jira_search_filters, jira_move_issues_to_backlog, jira_move_issues_to_backlog_for_board, jira_create_project, jira_get_all_projects, jira_get_project, jira_check_project_exists, jira_get_current_user, jira_update_project, jira_delete_project, jira_create_project_with_board, jira_get_issue_types, jira_get_project_issue_types, jira_create_user_story, jira_create_bug, jira_create_issue, jira_get_issue, jira_search_issues, jira_delete_issue, jira_get_issue_transitions, jira_update_issue`
     );
 
     res.on('close', () => {

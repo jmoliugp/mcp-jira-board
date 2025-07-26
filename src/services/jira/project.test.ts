@@ -34,7 +34,7 @@ vi.mock('./networking.js', () => ({
 }));
 
 import { axiosClient, jiraApiEndpoint } from './networking.js';
-const mockedAxiosClient = vi.mocked(axiosClient);
+const mockedAxiosClient = vi.mocked(axiosClient) as any;
 
 describe('Project Service', () => {
   const projectKey = 'TEST';

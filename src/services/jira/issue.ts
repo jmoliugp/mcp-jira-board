@@ -636,3 +636,188 @@ export const createBug = async (
     throw new InternalServerError('Unexpected error in createBug.', context);
   }
 };
+
+export interface UpdateIssueInput {
+  fields?: {
+    summary?: string;
+    description?: string | AtlassianDocumentContent;
+    assignee?: {
+      accountId: string;
+    } | null; // null to unassign
+    priority?: {
+      id: string;
+    };
+    labels?: string[];
+    components?: Array<{
+      id: string;
+    }>;
+    fixVersions?: Array<{
+      id: string;
+    }>;
+    customfield_10016?: number; // Story Points
+    [key: string]: any; // Allow for custom fields
+  };
+  transition?: {
+    id: string;
+  };
+  update?: {
+    comment?: Array<{
+      add: {
+        body: string | AtlassianDocumentContent;
+      };
+    }>;
+  };
+}
+
+export interface UpdateIssueResponse {
+  id: string;
+  key: string;
+  self: string;
+}
+
+export interface IssueTransition {
+  id: string;
+  name: string;
+  to: {
+    id: string;
+    name: string;
+    statusCategory: {
+      id: number;
+      key: string;
+      colorName: string;
+    };
+  };
+  hasScreen: boolean;
+  isGlobal: boolean;
+  isInitial: boolean;
+  isConditional: boolean;
+  isLooped: boolean;
+}
+
+export interface GetIssueTransitionsResponse {
+  expand: string;
+  transitions: IssueTransition[];
+}
+
+/**
+ * Get available transitions for an issue.
+ * @param issueKeyOrId - The issue key (e.g., "PROJ-123") or ID
+ * @returns Available transitions for the issue
+ */
+export const getIssueTransitions = async (
+  issueKeyOrId: string
+): Promise<GetIssueTransitionsResponse> => {
+  const start = performance.now();
+  try {
+    const { data } = await axiosClient.get<GetIssueTransitionsResponse>(
+      format(jiraApiEndpoint.issue.getIssueTransitions, issueKeyOrId)
+    );
+
+    const end = performance.now();
+    log.info(`⏱️ getIssueTransitions executed in ${(end - start).toFixed(2)}ms`);
+    return data;
+  } catch (error) {
+    const err = error as AxiosError;
+    const status = err.response?.status;
+    const data = err.response?.data;
+    const context = {
+      status,
+      data,
+      issueKeyOrId,
+      endpoint: format(jiraApiEndpoint.issue.getIssueTransitions, issueKeyOrId),
+    };
+
+    if (status === 400) throw new UserInputError('Invalid input for getIssueTransitions.', context);
+    if (status === 401)
+      throw new AuthenticationError('Authentication failed for getIssueTransitions.', context);
+    if (status === 403)
+      throw new ForbiddenError('Access forbidden for getIssueTransitions.', context);
+    if (status === 404)
+      throw new NotFoundError('Issue not found for getIssueTransitions.', context);
+    if (status && status >= 500)
+      throw new InternalServerError('Internal server error in getIssueTransitions.', context);
+    throw new InternalServerError('Unexpected error in getIssueTransitions.', context);
+  }
+};
+
+/**
+ * Update an existing issue.
+ * @param issueKeyOrId - The issue key (e.g., "PROJ-123") or ID
+ * @param input - Update data including fields, transitions, and comments
+ * @returns The updated issue
+ */
+export const updateIssue = async (
+  issueKeyOrId: string,
+  input: UpdateIssueInput
+): Promise<UpdateIssueResponse> => {
+  const start = performance.now();
+
+  // Validate that at least one update operation is provided
+  if (!input.fields && !input.transition && !input.update) {
+    throw new UserInputError(
+      'At least one update operation (fields, transition, or update) is required.'
+    );
+  }
+
+  try {
+    // Convert plain text description to ADF format if needed
+    const processedInput = { ...input };
+    if (
+      processedInput.fields?.description &&
+      typeof processedInput.fields.description === 'string'
+    ) {
+      processedInput.fields.description = textToAtlassianDocument(
+        processedInput.fields.description
+      );
+    }
+
+    // Convert plain text comment to ADF format if needed
+    if (processedInput.update?.comment) {
+      processedInput.update.comment = processedInput.update.comment.map(comment => ({
+        add: {
+          body:
+            typeof comment.add.body === 'string'
+              ? textToAtlassianDocument(comment.add.body)
+              : comment.add.body,
+        },
+      }));
+    }
+
+    // Jira requires at least one of 'fields' or 'update' when making transitions
+    // If only transition is provided, add an empty update object
+    if (processedInput.transition && !processedInput.fields && !processedInput.update) {
+      processedInput.update = {};
+    }
+
+    const { data } = await axiosClient.put<UpdateIssueResponse>(
+      format(jiraApiEndpoint.issue.updateIssue, issueKeyOrId),
+      processedInput
+    );
+
+    const end = performance.now();
+    log.info(`⏱️ updateIssue executed in ${(end - start).toFixed(2)}ms`);
+    return data;
+  } catch (error) {
+    const err = error as AxiosError;
+    const status = err.response?.status;
+    const data = err.response?.data;
+    const context = {
+      status,
+      data,
+      input,
+      endpoint: format(jiraApiEndpoint.issue.updateIssue, issueKeyOrId),
+    };
+
+    if (status === 400) {
+      log.error(`❌ Jira API validation error: ${JSON.stringify(data, null, 2)}`);
+      throw new UserInputError('Invalid input for updateIssue.', context);
+    }
+    if (status === 401)
+      throw new AuthenticationError('Authentication failed for updateIssue.', context);
+    if (status === 403) throw new ForbiddenError('Access forbidden for updateIssue.', context);
+    if (status === 404) throw new NotFoundError('Issue not found for updateIssue.', context);
+    if (status && status >= 500)
+      throw new InternalServerError('Internal server error in updateIssue.', context);
+    throw new InternalServerError('Unexpected error in updateIssue.', context);
+  }
+};
