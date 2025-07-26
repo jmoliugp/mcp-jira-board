@@ -5,6 +5,7 @@ A Model Context Protocol (MCP) server that provides Jira board and backlog manag
 ## Features
 
 - **Board Management**: Create, list, get, and delete Jira boards
+- **Project Management**: Create, list, get, update, and delete Jira projects
 - **Backlog Management**: Move issues to and from backlogs
 - **Board Operations**: Get board issues, epics, sprints, and backlogs
 - **SSE/HTTP Transport**: Support for both SSE and Streamable HTTP connections
@@ -163,6 +164,15 @@ The MCP server supports two transport modes:
 - `jira_create_board`: Create a new scrum or kanban board
 - `jira_get_board_by_id`: Get board details by ID
 - `jira_delete_board`: Delete a board by ID
+
+### Project Management
+
+- `jira_create_project`: Create a new Jira project
+- `jira_get_all_projects`: Retrieve all projects with optional filtering
+- `jira_get_project`: Get project details by ID or key
+- `jira_update_project`: Update project information
+- `jira_delete_project`: Delete a project
+- `jira_create_project_with_board`: Create a project with an associated board
 
 ### Board Operations
 

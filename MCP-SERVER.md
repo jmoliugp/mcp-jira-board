@@ -18,6 +18,15 @@ This project provides a Model Context Protocol (MCP) server that exposes Jira bo
 - **`jira_get_board_issues`** - Get issues for a board
 - **`jira_move_issues_to_board`** - Move issues to a board with optional ranking
 
+#### Project Management
+
+- **`jira_create_project`** - Create a new Jira project
+- **`jira_get_all_projects`** - Retrieve all projects visible to the user with optional filtering
+- **`jira_get_project`** - Get project details by ID or key
+- **`jira_update_project`** - Update project information
+- **`jira_delete_project`** - Delete a project
+- **`jira_create_project_with_board`** - Create a project with an associated board
+
 #### Backlog Management
 
 - **`jira_move_issues_to_backlog`** - Move issues to the backlog (remove from sprints)
@@ -76,6 +85,14 @@ const newBoard = await callTool('jira_create_board', {
   name: 'My New Board',
   type: 'scrum',
   filterId: 12345,
+});
+
+// Create a new project
+const newProject = await callTool('jira_create_project', {
+  key: 'MYPROJ',
+  name: 'My New Project',
+  projectTypeKey: 'software',
+  description: 'A new software project',
 });
 
 // Get board backlog

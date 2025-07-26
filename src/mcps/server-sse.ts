@@ -8,6 +8,7 @@ import { Logger } from '../utils/log.js';
 import * as backlogService from '../services/jira/backlog.js';
 import * as boardService from '../services/jira/board.js';
 import * as filterService from '../services/jira/filter.js';
+import * as projectService from '../services/jira/project.js';
 
 // Import Jira services
 
@@ -36,7 +37,7 @@ server.tool(
     log.info(`🔧 Tool 'jira_get_all_boards' called with params: ${JSON.stringify(params)}`);
     log.info(`🔍 Params type: ${typeof params}, keys: ${params ? Object.keys(params) : 'null'}`);
     try {
-      const result = await boardService.getAllBoards(params || {});
+      const result = await boardService.getAllBoards(params);
 
       log.info(`✅ Retrieved ${result.values.length} boards`);
       log.info(`📤 Returning result to Cursor...`);
@@ -89,6 +90,192 @@ server.tool(
         log.error(`❌ Error message: ${error.message}`);
         log.error(`❌ Error stack: ${error.stack}`);
       }
+      throw error;
+    }
+  }
+);
+
+// Project Management Tools
+
+server.tool(
+  'jira_create_project',
+  {
+    key: z.string(),
+    name: z.string(),
+    projectTypeKey: z.enum(['software', 'service_desk', 'business']),
+    description: z.string().optional(),
+    leadAccountId: z.string().optional(),
+    url: z.string().optional(),
+    assigneeType: z.enum(['PROJECT_LEAD', 'UNASSIGNED']).optional(),
+  },
+  async params => {
+    log.info(`🔧 Tool 'jira_create_project' called with params: ${JSON.stringify(params)}`);
+    try {
+      const input: projectService.CreateProjectInput = {
+        key: params['key'],
+        name: params['name'],
+        projectTypeKey: params['projectTypeKey'],
+        ...(params['description'] && { description: params['description'] }),
+        ...(params['leadAccountId'] && { leadAccountId: params['leadAccountId'] }),
+        ...(params['url'] && { url: params['url'] }),
+        ...(params['assigneeType'] && { assigneeType: params['assigneeType'] }),
+      };
+
+      log.info(`📤 Sending to projectService.createProject: ${JSON.stringify(input)}`);
+
+      const result = await projectService.createProject(input);
+      log.info(`✅ Created project: ${result.name} (Key: ${result.key})`);
+      return {
+        content: [{ type: 'text', text: JSON.stringify(result, null, 2) }],
+      };
+    } catch (error) {
+      log.error(`❌ Error in jira_create_project: ${error}`);
+      if (error instanceof Error) {
+        log.error(`❌ Error message: ${error.message}`);
+        log.error(`❌ Error stack: ${error.stack}`);
+      }
+      throw error;
+    }
+  }
+);
+
+server.tool(
+  'jira_get_all_projects',
+  {
+    startAt: z.number().optional(),
+    maxResults: z.number().optional(),
+    orderBy: z.enum(['key', 'name', 'category', '-key', '-name', '-category']).optional(),
+    query: z.string().optional(),
+    typeKey: z.string().optional(),
+    status: z.enum(['live', 'archived', 'deleted']).optional(),
+  },
+  async params => {
+    log.info(`🔧 Tool 'jira_get_all_projects' called with params: ${JSON.stringify(params)}`);
+    try {
+      const result = await projectService.getAllProjects(params);
+      log.info(`✅ Retrieved ${result.values.length} projects`);
+      return {
+        content: [{ type: 'text', text: JSON.stringify(result, null, 2) }],
+      };
+    } catch (error) {
+      log.error(`❌ Error in jira_get_all_projects: ${error}`);
+      throw error;
+    }
+  }
+);
+
+server.tool(
+  'jira_get_project',
+  {
+    projectIdOrKey: z.string(),
+    expand: z.string().optional(),
+  },
+  async params => {
+    log.info(`🔧 Tool 'jira_get_project' called with params: ${JSON.stringify(params)}`);
+    try {
+      const result = await projectService.getProject(params['projectIdOrKey'], params['expand']);
+      log.info(`✅ Retrieved project: ${result.name} (Key: ${result.key})`);
+      return {
+        content: [{ type: 'text', text: JSON.stringify(result, null, 2) }],
+      };
+    } catch (error) {
+      log.error(`❌ Error in jira_get_project: ${error}`);
+      throw error;
+    }
+  }
+);
+
+server.tool(
+  'jira_update_project',
+  {
+    projectIdOrKey: z.string(),
+    name: z.string().optional(),
+    description: z.string().optional(),
+    url: z.string().optional(),
+    assigneeType: z.enum(['PROJECT_LEAD', 'UNASSIGNED']).optional(),
+    leadAccountId: z.string().optional(),
+  },
+  async params => {
+    log.info(`🔧 Tool 'jira_update_project' called with params: ${JSON.stringify(params)}`);
+    try {
+      const { projectIdOrKey, ...updateData } = params;
+      const input: projectService.UpdateProjectInput = updateData;
+
+      const result = await projectService.updateProject(projectIdOrKey, input);
+      log.info(`✅ Updated project: ${result.name} (Key: ${result.key})`);
+      return {
+        content: [{ type: 'text', text: JSON.stringify(result, null, 2) }],
+      };
+    } catch (error) {
+      log.error(`❌ Error in jira_update_project: ${error}`);
+      throw error;
+    }
+  }
+);
+
+server.tool(
+  'jira_delete_project',
+  {
+    projectIdOrKey: z.string(),
+  },
+  async params => {
+    log.info(`🔧 Tool 'jira_delete_project' called with params: ${JSON.stringify(params)}`);
+    try {
+      await projectService.deleteProject(params['projectIdOrKey']);
+      log.info(`✅ Deleted project: ${params['projectIdOrKey']}`);
+      return {
+        content: [
+          {
+            type: 'text',
+            text: JSON.stringify({ message: 'Project deleted successfully' }, null, 2),
+          },
+        ],
+      };
+    } catch (error) {
+      log.error(`❌ Error in jira_delete_project: ${error}`);
+      throw error;
+    }
+  }
+);
+
+server.tool(
+  'jira_create_project_with_board',
+  {
+    key: z.string(),
+    name: z.string(),
+    projectTypeKey: z.enum(['software', 'service_desk', 'business']),
+    description: z.string().optional(),
+    leadAccountId: z.string().optional(),
+    boardName: z.string(),
+    boardType: z.enum(['scrum', 'kanban']),
+  },
+  async params => {
+    log.info(
+      `🔧 Tool 'jira_create_project_with_board' called with params: ${JSON.stringify(params)}`
+    );
+    try {
+      const projectInput: projectService.CreateProjectInput = {
+        key: params['key'],
+        name: params['name'],
+        projectTypeKey: params['projectTypeKey'],
+        ...(params['description'] && { description: params['description'] }),
+        ...(params['leadAccountId'] && { leadAccountId: params['leadAccountId'] }),
+      };
+
+      const result = await projectService.createProjectWithBoard(
+        projectInput,
+        params['boardName'],
+        params['boardType']
+      );
+
+      log.info(
+        `✅ Created project with board: ${result.project.name} (Key: ${result.project.key})`
+      );
+      return {
+        content: [{ type: 'text', text: JSON.stringify(result, null, 2) }],
+      };
+    } catch (error) {
+      log.error(`❌ Error in jira_create_project_with_board: ${error}`);
       throw error;
     }
   }
@@ -510,7 +697,7 @@ async function handleSSE(req: http.IncomingMessage, res: http.ServerResponse, ur
     await server.connect(transport);
     log.info(`✅ MCP server connected to SSE transport: ${transport.sessionId}`);
     log.info(
-      `📋 Available tools: jira_get_all_boards, jira_create_board, jira_get_board_by_id, jira_delete_board, jira_get_board_backlog, jira_get_board_epics, jira_get_board_sprints, jira_get_board_issues, jira_move_issues_to_board, jira_get_my_filters, jira_get_favourite_filters, jira_search_filters, jira_move_issues_to_backlog, jira_move_issues_to_backlog_for_board`
+      `📋 Available tools: jira_get_all_boards, jira_create_board, jira_get_board_by_id, jira_delete_board, jira_get_board_backlog, jira_get_board_epics, jira_get_board_sprints, jira_get_board_issues, jira_move_issues_to_board, jira_get_my_filters, jira_get_favourite_filters, jira_search_filters, jira_move_issues_to_backlog, jira_move_issues_to_backlog_for_board, jira_create_project, jira_get_all_projects, jira_get_project, jira_update_project, jira_delete_project, jira_create_project_with_board`
     );
 
     res.on('close', () => {
