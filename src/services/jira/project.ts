@@ -159,8 +159,8 @@ export const createProject = async (input: CreateProjectInput): Promise<CreatePr
       ...input,
       // Always set the current user as project lead for admin privileges
       leadAccountId: currentUser.accountId,
-      // Always assign issues to project lead by default
-      assigneeType: 'PROJECT_LEAD',
+      // Set assignee type to UNASSIGNED by default, unless explicitly specified
+      assigneeType: input.assigneeType || 'UNASSIGNED',
     };
 
     log.info(`🔧 Creating project with admin privileges:`);
