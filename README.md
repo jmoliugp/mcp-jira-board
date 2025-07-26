@@ -186,6 +186,7 @@ The MCP server supports two transport modes:
 - `jira_update_issue`: Update issue fields (assignee, priority, status, summary, description) and add comments
 - `jira_delete_issue`: Delete an issue by key or ID
 - `jira_search_issues`: Search for issues using JQL
+- `jira_validate_jql`: Validate JQL queries and get suggestions
 
 ### AI Story Estimation
 
@@ -274,6 +275,28 @@ const stats = await jira_get_project_ai_estimation_stats({
 ```
 
 // Field Configuration and Custom Fields tools have been removed to simplify the codebase
+
+### JQL Best Practices
+
+```typescript
+// Validate JQL before searching
+const validation = await jira_validate_jql({
+  jql: 'project = FITPULSE AND "Story Points" is EMPTY',
+});
+
+// Use recommended queries
+const issues = await jira_search_issues({
+  jql: 'project = FITPULSE AND timeoriginalestimate is EMPTY',
+  maxResults: 10,
+});
+```
+
+**Common JQL Issues:**
+
+- Use `timeoriginalestimate` instead of `"Story Points"`
+- Use `is EMPTY` for standard fields, `is null` for custom fields
+- Always start with `project = PROJECT_KEY`
+- Avoid custom field names in quotes unless they exist
 
 ````
 

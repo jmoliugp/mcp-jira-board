@@ -4,8 +4,7 @@ import { performance } from 'perf_hooks';
 import { Logger } from '../../utils/log.js';
 import * as issueService from './issue.js';
 import * as projectService from './project.js';
-import * as customFieldService from './custom-field.js';
-import * as fieldConfigurationService from './field-configuration.js';
+// Custom field services removed to simplify the codebase
 
 const log = new Logger('jira/estimation');
 
@@ -72,34 +71,9 @@ export const estimateStoriesInProject = async (
     await projectService.getProject(projectKey);
     log.info(`✅ Project verified: ${projectKey}`);
 
-    // Get or create a custom story points field
-    log.info(`🔧 Setting up custom story points field for project: ${projectKey}`);
-    let storyPointsFieldId: string | null = null;
-
-    try {
-      storyPointsFieldId = await customFieldService.getStoryPointsFieldId(
-        projectKey,
-        'AI Story Points'
-      );
-      log.info(`✅ Custom story points field ready: ${storyPointsFieldId}`);
-
-      // Try to configure the story points field in the project
-      log.info(`🔧 Attempting to configure story points field in project...`);
-      const configured = await fieldConfigurationService.configureStoryPointsField(projectKey);
-
-      if (configured) {
-        log.info(`✅ Story points field successfully configured in project ${projectKey}`);
-      } else {
-        log.info(`ℹ️ Story points field configuration not available - will use fallback mode`);
-      }
-    } catch (error) {
-      log.warn(`⚠️ Could not create custom story points field: ${error}`);
-      log.info(`💡 The tool will continue with labels and comments only`);
-      log.info(
-        `💡 This is normal if you don't have admin permissions or if custom fields are disabled`
-      );
-      storyPointsFieldId = null;
-    }
+    // Try to use labels for estimation, fallback to comments only if labels fail
+    log.info(`🔧 Using estimation approach for project: ${projectKey}`);
+    log.info(`💡 Will try to add labels and comments, fallback to comments only if labels fail`);
 
     // Search for all main issues (not subtasks) in the project
     log.info(`🔍 Searching for main issues in project: ${projectKey}`);
@@ -143,68 +117,61 @@ export const estimateStoriesInProject = async (
       try {
         log.info(`📝 Estimating issue: ${issue.key} - "${issue.fields.summary}"`);
 
-        // Prepare update input - start with just labels and comments
+        // Prepare update input - try to add labels, fallback to comments only if labels fail
         const updateInput: issueService.UpdateIssueInput = {
           fields: {
-            labels: [...(issue.fields.labels || []), estimationLabel], // Add estimation label
+            labels: [...(issue.fields.labels || []), estimationLabel], // Try to add estimation label
           },
           update: {
             comment: [
               {
                 add: {
-                  body: `🤖 **AI Estimation Applied**\n\nEstimated story points: **${defaultStoryPoints}**\n\n*This AI estimation was applied automatically and may need review by the development team.*`,
+                  body: `🤖 AI Estimation\n\nSuggested story points: ${defaultStoryPoints}\n\nThis AI estimation was applied automatically and may need review by the development team.`,
                 },
               },
             ],
           },
         };
 
-        // Try to update the issue with custom story points field
-        let estimateSet = false;
-        if (storyPointsFieldId) {
-          try {
-            const updateWithStoryPoints: issueService.UpdateIssueInput = {
-              fields: {
-                [storyPointsFieldId]: defaultStoryPoints, // Use custom field ID
-                labels: [...(issue.fields.labels || []), estimationLabel],
-              },
+        // Try to update with labels first, fallback to comments only if labels fail
+        try {
+          await issueService.updateIssue(issue.key, updateInput);
+          log.info(`✅ Successfully estimated ${issue.key} (with labels and comments)`);
+        } catch (labelError) {
+          // If labels fail, try without labels
+          if (labelError instanceof Error && labelError.message.includes('labels')) {
+            log.warn(
+              `⚠️ Labels failed for ${issue.key}, trying without labels: ${labelError.message}`
+            );
+
+            const fallbackInput: issueService.UpdateIssueInput = {
               update: {
                 comment: [
                   {
                     add: {
-                      body: `🤖 **AI Estimation Applied**\n\nStory points set to **${defaultStoryPoints}** by AI-powered automatic estimation system.\n\n*This AI estimation was applied automatically and may need review by the development team.*`,
+                      body: `🤖 AI Estimation\n\nSuggested story points: ${defaultStoryPoints}\n\nThis AI estimation was applied automatically and may need review by the development team.`,
                     },
                   },
                 ],
               },
             };
 
-            await issueService.updateIssue(issue.key, updateWithStoryPoints);
-            estimateSet = true;
+            await issueService.updateIssue(issue.key, fallbackInput);
             log.info(
-              `✅ Successfully estimated ${issue.key} with ${defaultStoryPoints} story points`
+              `✅ Successfully estimated ${issue.key} (comments only - labels not available)`
             );
-          } catch (estimateError) {
-            // If custom field is not available, try without it
-            log.warn(
-              `⚠️ Custom story points field not available for ${issue.key}, trying without estimate`
-            );
-
-            await issueService.updateIssue(issue.key, updateInput);
-            log.info(`✅ Successfully estimated ${issue.key} (labels and comments only)`);
+          } else {
+            // If it's not a label error, re-throw
+            throw labelError;
           }
-        } else {
-          // No custom field available, use labels and comments only
-          await issueService.updateIssue(issue.key, updateInput);
-          log.info(`✅ Successfully estimated ${issue.key} (labels and comments only)`);
         }
 
         // Add to successful estimations
         result.estimatedIssues.push({
           key: issue.key,
           summary: issue.fields.summary,
-          storyPoints: estimateSet ? defaultStoryPoints : 0,
-          labels: [...(issue.fields.labels || []), estimationLabel],
+          storyPoints: 0, // No story points set (simplified approach)
+          labels: [...(issue.fields.labels || []), estimationLabel], // Include the estimation label
         });
 
         result.estimatedStories++;

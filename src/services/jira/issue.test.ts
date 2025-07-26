@@ -546,7 +546,6 @@ describe('Issue Service', () => {
               ]),
             }),
             assignee: { accountId: 'user123' },
-            customfield_10016: 5,
             labels: ['test', 'story'],
           }),
         })

@@ -69,13 +69,7 @@ export const jiraApiEndpoint = {
     getIssueType: '/rest/api/3/issuetype/%s',
     getIssueTransitions: '/rest/api/3/issue/%s/transitions',
   },
-  field: {
-    getFields: '/rest/api/3/field',
-    createCustomField: '/rest/api/3/field',
-    getField: '/rest/api/3/field/%s',
-    updateField: '/rest/api/3/field/%s',
-    deleteField: '/rest/api/3/field/%s',
-  },
+  // Field endpoints removed to simplify the codebase
 };
 
 export const axiosClient = axios.create({

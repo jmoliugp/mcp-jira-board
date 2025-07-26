@@ -17,6 +17,39 @@ import * as projectService from './project.js';
 const log = new Logger('jira/issue');
 
 /**
+ * Validate and suggest improvements for JQL queries
+ * @param jql - The JQL query to validate
+ * @returns Suggestions for improving the query
+ */
+function validateAndSuggestJQL(jql: string): string[] {
+  const suggestions: string[] = [];
+
+  // Check for common field name issues
+  if (jql.includes('"Story Points"')) {
+    suggestions.push(
+      'The field "Story Points" may not exist. Try using "timeoriginalestimate" instead.'
+    );
+    suggestions.push('Alternative query: project = FITPULSE AND timeoriginalestimate is EMPTY');
+  }
+
+  if (jql.includes('"Story Points"') && jql.includes('is EMPTY')) {
+    suggestions.push('Try using "is null" instead of "is EMPTY" for time fields.');
+  }
+
+  // Check for project key issues
+  if (jql.includes('project =') && !jql.includes('project = FITPULSE')) {
+    suggestions.push('Make sure the project key is correct and exists.');
+  }
+
+  // Check for field name issues
+  if (jql.includes('"') && jql.includes('is EMPTY')) {
+    suggestions.push('Custom field names in quotes may not exist. Try using standard field names.');
+  }
+
+  return suggestions;
+}
+
+/**
  * Convert plain text to Atlassian Document Format (ADF)
  * @param text - Plain text to convert
  * @returns ADF formatted document
@@ -87,8 +120,7 @@ export interface IssueField {
   fixVersions?: Array<{
     id: string;
   }>;
-  customfield_10016?: number; // Story Points
-  customfield_10014?: string; // Sprint
+  // Custom fields removed to simplify the codebase
   [key: string]: any; // Allow for custom fields
 }
 
@@ -335,7 +367,20 @@ export const searchIssues = async (params: SearchIssuesParams): Promise<SearchIs
     const data = err.response?.data;
     const context = { status, data, params, endpoint: jiraApiEndpoint.issue.searchIssues };
 
-    if (status === 400) throw new UserInputError('Invalid input for searchIssues.', context);
+    if (status === 400) {
+      log.error(`❌ JQL validation error: ${JSON.stringify(data, null, 2)}`);
+
+      // Provide helpful suggestions for JQL issues
+      if (params.jql) {
+        const suggestions = validateAndSuggestJQL(params.jql);
+        if (suggestions.length > 0) {
+          log.error(`💡 JQL Suggestions:`);
+          suggestions.forEach(suggestion => log.error(`   - ${suggestion}`));
+        }
+      }
+
+      throw new UserInputError('Invalid input for searchIssues.', context);
+    }
     if (status === 401)
       throw new AuthenticationError('Authentication failed for searchIssues.', context);
     if (status === 403) throw new ForbiddenError('Access forbidden for searchIssues.', context);
@@ -489,9 +534,10 @@ export const createUserStory = async (
       };
     }
 
-    if (storyPoints !== undefined) {
-      fields.customfield_10016 = storyPoints; // Story Points field
-    }
+    // Temporarily disabled story points field due to configuration issues
+    // if (storyPoints !== undefined) {
+    //   fields.customfield_10016 = storyPoints; // Story Points field
+    // }
 
     // Note: Labels field might not be available on all projects
     // Only include labels if they are provided and the project supports them
@@ -597,9 +643,10 @@ export const createBug = async (
       };
     }
 
-    if (labels && labels.length > 0) {
-      fields.labels = labels;
-    }
+    // Labels temporarily disabled to avoid field configuration issues
+    // if (labels && labels.length > 0) {
+    //   fields.labels = labels;
+    // }
 
     const result = await createIssue({ fields });
 
@@ -654,7 +701,7 @@ export interface UpdateIssueInput {
     fixVersions?: Array<{
       id: string;
     }>;
-    customfield_10016?: number; // Story Points
+    // Custom fields removed to simplify the codebase
     [key: string]: any; // Allow for custom fields
   };
   transition?: {
