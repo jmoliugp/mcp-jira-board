@@ -15,12 +15,14 @@ vi.mock('./networking.js', () => ({
   axiosClient: {
     get: vi.fn(),
     post: vi.fn(),
+    delete: vi.fn(),
   },
   jiraApiEndpoint: {
     issue: {
       getIssueTypes: '/rest/api/3/issuetype',
       createIssue: '/rest/api/3/issue',
       getIssue: '/rest/api/3/issue/%s',
+      deleteIssue: '/rest/api/3/issue/%s',
       searchIssues: '/rest/api/3/search',
     },
   },
@@ -469,6 +471,38 @@ describe('Issue Service', () => {
     it('should throw UserInputError on 400', async () => {
       mockedAxiosClient.post.mockRejectedValueOnce(makeAxiosError(400));
       await expect(issue.searchIssues(searchParams)).rejects.toBeInstanceOf(UserInputError);
+    });
+  });
+
+  describe('deleteIssue', () => {
+    it('should resolve on success', async () => {
+      mockedAxiosClient.delete.mockResolvedValueOnce({ data: undefined });
+      await expect(issue.deleteIssue('PROJ-123')).resolves.toBeUndefined();
+    });
+
+    it('should throw UserInputError on 400', async () => {
+      mockedAxiosClient.delete.mockRejectedValueOnce(makeAxiosError(400));
+      await expect(issue.deleteIssue('PROJ-123')).rejects.toBeInstanceOf(UserInputError);
+    });
+
+    it('should throw AuthenticationError on 401', async () => {
+      mockedAxiosClient.delete.mockRejectedValueOnce(makeAxiosError(401));
+      await expect(issue.deleteIssue('PROJ-123')).rejects.toBeInstanceOf(AuthenticationError);
+    });
+
+    it('should throw ForbiddenError on 403', async () => {
+      mockedAxiosClient.delete.mockRejectedValueOnce(makeAxiosError(403));
+      await expect(issue.deleteIssue('PROJ-123')).rejects.toBeInstanceOf(ForbiddenError);
+    });
+
+    it('should throw NotFoundError on 404', async () => {
+      mockedAxiosClient.delete.mockRejectedValueOnce(makeAxiosError(404));
+      await expect(issue.deleteIssue('PROJ-999')).rejects.toBeInstanceOf(NotFoundError);
+    });
+
+    it('should throw InternalServerError on 500', async () => {
+      mockedAxiosClient.delete.mockRejectedValueOnce(makeAxiosError(500));
+      await expect(issue.deleteIssue('PROJ-123')).rejects.toBeInstanceOf(InternalServerError);
     });
   });
 

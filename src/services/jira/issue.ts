@@ -343,6 +343,40 @@ export const searchIssues = async (params: SearchIssuesParams): Promise<SearchIs
 };
 
 /**
+ * Delete an issue by key or ID.
+ * @param issueKeyOrId - The issue key (e.g., "PROJ-123") or ID
+ * @returns void
+ */
+export const deleteIssue = async (issueKeyOrId: string): Promise<void> => {
+  const start = performance.now();
+  try {
+    await axiosClient.delete(format(jiraApiEndpoint.issue.deleteIssue, issueKeyOrId));
+
+    const end = performance.now();
+    log.info(`⏱️ deleteIssue executed in ${(end - start).toFixed(2)}ms`);
+  } catch (error) {
+    const err = error as AxiosError;
+    const status = err.response?.status;
+    const data = err.response?.data;
+    const context = {
+      status,
+      data,
+      issueKeyOrId,
+      endpoint: format(jiraApiEndpoint.issue.deleteIssue, issueKeyOrId),
+    };
+
+    if (status === 400) throw new UserInputError('Invalid input for deleteIssue.', context);
+    if (status === 401)
+      throw new AuthenticationError('Authentication failed for deleteIssue.', context);
+    if (status === 403) throw new ForbiddenError('Access forbidden for deleteIssue.', context);
+    if (status === 404) throw new NotFoundError('Issue not found for deleteIssue.', context);
+    if (status && status >= 500)
+      throw new InternalServerError('Internal server error in deleteIssue.', context);
+    throw new InternalServerError('Unexpected error in deleteIssue.', context);
+  }
+};
+
+/**
  * Create a user story in a project.
  * This is a convenience function that creates an issue with the "Story" issue type.
  * @param projectKey - The project key where to create the story

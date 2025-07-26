@@ -119,23 +119,26 @@ server.tool(
   async params => {
     log.info(`🔧 Tool 'jira_create_project' called with params: ${JSON.stringify(params)}`);
     try {
-      // Get current user to get the accountId
-      const currentUser = await projectService.getCurrentUser();
+      log.info(`🔧 Creating project with automatic admin privileges...`);
 
       const input: projectService.CreateProjectInput = {
         key: params['key'],
         name: params['name'],
         projectTypeKey: params['projectTypeKey'],
         ...(params['description'] && { description: params['description'] }),
-        leadAccountId: currentUser.accountId, // Use the actual accountId
         ...(params['url'] && { url: params['url'] }),
-        ...(params['assigneeType'] && { assigneeType: params['assigneeType'] }),
+        // Note: assigneeType and leadAccountId will be automatically set by the service
+        // to ensure admin privileges for the current user
       };
 
-      log.info(`📤 Sending to projectService.createProject: ${JSON.stringify(input)}`);
+      log.info(
+        `📤 Sending to projectService.createProject (with auto-admin): ${JSON.stringify(input)}`
+      );
 
       const result = await projectService.createProject(input);
-      log.info(`✅ Created project: ${result.name} (Key: ${result.key})`);
+      log.info(`✅ Created project with admin privileges: ${result.name} (Key: ${result.key})`);
+      log.info(`🎉 You now have FULL ADMIN PERMISSIONS for all operations in this project!`);
+
       return {
         content: [{ type: 'text', text: JSON.stringify(result, null, 2) }],
       };
@@ -324,12 +327,15 @@ server.tool(
       `🔧 Tool 'jira_create_project_with_board' called with params: ${JSON.stringify(params)}`
     );
     try {
+      log.info(`🔧 Creating project with board and automatic admin privileges...`);
+
       const projectInput: projectService.CreateProjectInput = {
         key: params['key'],
         name: params['name'],
         projectTypeKey: params['projectTypeKey'],
         ...(params['description'] && { description: params['description'] }),
-        ...(params['leadAccountId'] && { leadAccountId: params['leadAccountId'] }),
+        // Note: leadAccountId will be automatically set by the service
+        // to ensure admin privileges for the current user
       };
 
       const result = await projectService.createProjectWithBoard(
@@ -339,8 +345,10 @@ server.tool(
       );
 
       log.info(
-        `✅ Created project with board: ${result.project.name} (Key: ${result.project.key})`
+        `✅ Created project with board and admin privileges: ${result.project.name} (Key: ${result.project.key})`
       );
+      log.info(`🎉 You now have FULL ADMIN PERMISSIONS for all operations in this project!`);
+
       return {
         content: [{ type: 'text', text: JSON.stringify(result, null, 2) }],
       };
@@ -897,6 +905,35 @@ server.tool(
       };
     } catch (error) {
       log.error(`❌ Error in jira_search_issues: ${error}`);
+      throw error;
+    }
+  }
+);
+
+server.tool(
+  'jira_delete_issue',
+  {
+    issueKeyOrId: z.string(),
+  },
+  async params => {
+    log.info(`🔧 Tool 'jira_delete_issue' called with params: ${JSON.stringify(params)}`);
+    try {
+      await issueService.deleteIssue(params['issueKeyOrId']);
+      log.info(`✅ Deleted issue: ${params['issueKeyOrId']}`);
+      return {
+        content: [
+          {
+            type: 'text',
+            text: JSON.stringify(
+              { message: 'Issue deleted successfully', issueKeyOrId: params['issueKeyOrId'] },
+              null,
+              2
+            ),
+          },
+        ],
+      };
+    } catch (error) {
+      log.error(`❌ Error in jira_delete_issue: ${error}`);
       throw error;
     }
   }
