@@ -106,57 +106,72 @@ server.tool(
 
 // Project Management Tools
 
-server.tool(
-  'jira_create_project',
-  {
-    key: z.string(),
-    name: z.string(),
-    projectTypeKey: z.enum(['software', 'service_desk', 'business']),
-    description: z.string().optional(),
-    url: z.string().optional(),
-    assigneeType: z.enum(['PROJECT_LEAD', 'UNASSIGNED']).optional(),
-  },
-  async params => {
-    log.info(`🔧 Tool 'jira_create_project' called with params: ${JSON.stringify(params)}`);
-    try {
-      log.info(`🔧 Creating project with automatic admin privileges...`);
+// server.tool(
+//   'jira_create_project',
+//   {
+//     key: z.string(),
+//     name: z.string(),
+//     projectTypeKey: z.enum(['software', 'service_desk', 'business']),
+//     description: z.string().optional(),
+//     url: z.string().optional(),
+//     assigneeType: z.enum(['PROJECT_LEAD', 'UNASSIGNED']).optional(),
+//     boardName: z.string().optional(),
+//     boardType: z.enum(['scrum', 'kanban']).optional(),
+//   },
+//   async params => {
+//     log.info(`🔧 Tool 'jira_create_project' called with params: ${JSON.stringify(params)}`);
+//     try {
+//       log.info(`🔧 Creating project with automatic admin privileges...`);
 
-      const input: projectService.CreateProjectInput = {
-        key: params['key'],
-        name: params['name'],
-        projectTypeKey: params['projectTypeKey'],
-        ...(params['description'] && { description: params['description'] }),
-        ...(params['url'] && { url: params['url'] }),
-        // Note: assigneeType and leadAccountId will be automatically set by the service
-        // to ensure admin privileges for the current user
-      };
+//       const input: projectService.CreateProjectInput = {
+//         key: params['key'],
+//         name: params['name'],
+//         projectTypeKey: params['projectTypeKey'],
+//         ...(params['description'] && { description: params['description'] }),
+//         ...(params['url'] && { url: params['url'] }),
+//         // Note: assigneeType and leadAccountId will be automatically set by the service
+//         // to ensure admin privileges for the current user
+//       };
 
-      log.info(
-        `📤 Sending to projectService.createProject (with auto-admin): ${JSON.stringify(input)}`
-      );
+//       // Determine board name and type
+//       const boardName = params['boardName'] || `${params['name']} Board`;
+//       const boardType = params['boardType'] || 'scrum';
 
-      const result = await projectService.createProject(input);
-      log.info(`✅ Created project with admin privileges: ${result.name} (Key: ${result.key})`);
-      log.info(`🎉 You now have FULL ADMIN PERMISSIONS for all operations in this project!`);
+//       log.info(`🔧 Creating project with board: ${boardName} (${boardType})`);
 
-      return {
-        content: [{ type: 'text', text: JSON.stringify(result, null, 2) }],
-      };
-    } catch (error) {
-      log.error(`❌ Error in jira_create_project: ${error}`);
-      if (error instanceof Error) {
-        log.error(`❌ Error message: ${error.message}`);
-        log.error(`❌ Error stack: ${error.stack}`);
+//       log.info(`📤 Sending to projectService.createProjectWithBoard: ${JSON.stringify(input)}`);
 
-        // Add more detailed error information
-        if ('context' in error && error.context) {
-          log.error(`❌ Error context: ${JSON.stringify(error.context, null, 2)}`);
-        }
-      }
-      throw error;
-    }
-  }
-);
+//       const result = await projectService.createProjectWithBoard(input, boardName, boardType);
+//       log.info(
+//         `✅ Created project with admin privileges: ${result.project.name} (Key: ${result.project.key})`
+//       );
+
+//       if (result.board) {
+//         log.info(`🎉 Board "${result.board.name}" (ID: ${result.board.id}) created successfully!`);
+//       } else {
+//         log.warn(`⚠️ Project created but board creation failed`);
+//       }
+
+//       log.info(`🎉 You now have FULL ADMIN PERMISSIONS for all operations in this project!`);
+
+//       return {
+//         content: [{ type: 'text', text: JSON.stringify(result, null, 2) }],
+//       };
+//     } catch (error) {
+//       log.error(`❌ Error in jira_create_project: ${error}`);
+//       if (error instanceof Error) {
+//         log.error(`❌ Error message: ${error.message}`);
+//         log.error(`❌ Error stack: ${error.stack}`);
+
+//         // Add more detailed error information
+//         if ('context' in error && error.context) {
+//           log.error(`❌ Error context: ${JSON.stringify(error.context, null, 2)}`);
+//         }
+//       }
+//       throw error;
+//     }
+//   }
+// );
 
 server.tool(
   'jira_get_all_projects',
@@ -318,7 +333,8 @@ server.tool(
     name: z.string(),
     projectTypeKey: z.enum(['software', 'service_desk', 'business']),
     description: z.string().optional(),
-    leadAccountId: z.string().optional(),
+    url: z.string().optional(),
+    assigneeType: z.enum(['PROJECT_LEAD', 'UNASSIGNED']).optional(),
     boardName: z.string(),
     boardType: z.enum(['scrum', 'kanban']),
   },
@@ -334,7 +350,8 @@ server.tool(
         name: params['name'],
         projectTypeKey: params['projectTypeKey'],
         ...(params['description'] && { description: params['description'] }),
-        // Note: leadAccountId will be automatically set by the service
+        ...(params['url'] && { url: params['url'] }),
+        // Note: assigneeType and leadAccountId will be automatically set by the service
         // to ensure admin privileges for the current user
       };
 
@@ -345,8 +362,15 @@ server.tool(
       );
 
       log.info(
-        `✅ Created project with board and admin privileges: ${result.project.name} (Key: ${result.project.key})`
+        `✅ Created project with admin privileges: ${result.project.name} (Key: ${result.project.key})`
       );
+
+      if (result.board) {
+        log.info(`🎉 Board "${result.board.name}" (ID: ${result.board.id}) created successfully!`);
+      } else {
+        log.warn(`⚠️ Project created but board creation failed`);
+      }
+
       log.info(`🎉 You now have FULL ADMIN PERMISSIONS for all operations in this project!`);
 
       return {
@@ -1052,7 +1076,7 @@ async function handleSSE(req: http.IncomingMessage, res: http.ServerResponse, ur
     await server.connect(transport);
     log.info(`✅ MCP server connected to SSE transport: ${transport.sessionId}`);
     log.info(
-      `📋 Available tools: jira_get_all_boards, jira_create_board, jira_get_board_by_id, jira_delete_board, jira_get_board_backlog, jira_get_board_epics, jira_get_board_sprints, jira_get_board_issues, jira_move_issues_to_board, jira_get_my_filters, jira_get_favourite_filters, jira_search_filters, jira_move_issues_to_backlog, jira_move_issues_to_backlog_for_board, jira_create_project, jira_get_all_projects, jira_get_project, jira_check_project_exists, jira_get_current_user, jira_update_project, jira_delete_project, jira_create_project_with_board, jira_get_issue_types, jira_create_user_story, jira_create_bug, jira_create_issue, jira_get_issue, jira_search_issues`
+      `📋 Available tools: jira_get_all_boards, jira_create_board, jira_get_board_by_id, jira_delete_board, jira_get_board_backlog, jira_get_board_epics, jira_get_board_sprints, jira_get_board_issues, jira_move_issues_to_board, jira_get_my_filters, jira_get_favourite_filters, jira_search_filters, jira_move_issues_to_backlog, jira_move_issues_to_backlog_for_board, jira_create_project, jira_get_all_projects, jira_get_project, jira_check_project_exists, jira_get_current_user, jira_update_project, jira_delete_project, jira_create_project_with_board, jira_get_issue_types, jira_create_user_story, jira_create_bug, jira_create_issue, jira_get_issue, jira_search_issues, jira_delete_issue`
     );
 
     res.on('close', () => {

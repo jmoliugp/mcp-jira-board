@@ -360,7 +360,7 @@ export const createProjectWithBoard = async (
   projectInput: CreateProjectInput,
   boardName: string,
   boardType: 'scrum' | 'kanban'
-): Promise<{ project: CreateProjectResponse; board?: any }> => {
+): Promise<{ project: CreateProjectResponse; board: any }> => {
   const start = performance.now();
   try {
     log.info(`🔧 Creating project with board and admin privileges:`);
@@ -368,17 +368,55 @@ export const createProjectWithBoard = async (
     log.info(`   - Board: ${boardName} (${boardType})`);
 
     // First create the project (this will automatically have admin privileges)
+    log.info(`📤 Creating project...`);
     const project = await createProject(projectInput);
+    log.info(`✅ Project created successfully: ${project.key} (${project.name})`);
 
-    // Then create a board for the project
-    // Note: This would require importing the board service
-    // For now, we'll return just the project
-    const end = performance.now();
-    log.info(`⏱️ createProjectWithBoard executed in ${(end - start).toFixed(2)}ms`);
-    log.info(`✅ Project with board created successfully with admin privileges!`);
+    try {
+      // Import board service and filter service
+      log.info(`📦 Importing board and filter services...`);
+      const { createBoard } = await import('./board.js');
+      const { getOrCreateDefaultFilter } = await import('./filter.js');
+      log.info(`✅ Services imported successfully`);
 
-    return { project };
+      // Get or create a default filter for the board
+      log.info(`🔍 Getting or creating default filter...`);
+      const filterId = await getOrCreateDefaultFilter();
+      log.info(`✅ Filter ID obtained: ${filterId}`);
+
+      // Create the board for the project
+      const boardInput = {
+        name: boardName,
+        type: boardType,
+        filterId: filterId,
+        location: {
+          type: 'project' as const,
+          projectKeyOrId: project.key,
+        },
+      };
+
+      log.info(`📤 Creating board with input: ${JSON.stringify(boardInput)}`);
+      const board = await createBoard(boardInput);
+      log.info(`✅ Board created successfully: ${board.name} (ID: ${board.id})`);
+
+      const end = performance.now();
+      log.info(`⏱️ createProjectWithBoard executed in ${(end - start).toFixed(2)}ms`);
+      log.info(`✅ Project with board created successfully with admin privileges!`);
+      log.info(`🎉 Board "${board.name}" (ID: ${board.id}) created for project "${project.name}"`);
+
+      return { project, board };
+    } catch (boardError) {
+      log.error(`❌ Error creating board: ${boardError}`);
+      log.error(`❌ Board error details: ${JSON.stringify(boardError, null, 2)}`);
+
+      // If board creation fails, still return the project
+      log.warn(`⚠️ Returning project without board due to board creation error`);
+      return { project, board: null };
+    }
   } catch (error) {
+    log.error(`❌ Error in createProjectWithBoard: ${error}`);
+    log.error(`❌ Error details: ${JSON.stringify(error, null, 2)}`);
+
     const err = error as AxiosError;
     const status = err.response?.status;
     const data = err.response?.data;
