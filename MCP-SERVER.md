@@ -20,12 +20,12 @@ This project provides a Model Context Protocol (MCP) server that exposes Jira bo
 
 #### Project Management
 
-- **`jira_create_project`** - Create a new Jira project
+- **`jira_create_project`** - Create a new Jira project with automatic admin privileges
 - **`jira_get_all_projects`** - Retrieve all projects visible to the user with optional filtering
 - **`jira_get_project`** - Get project details by ID or key
 - **`jira_update_project`** - Update project information
 - **`jira_delete_project`** - Delete a project
-- **`jira_create_project_with_board`** - Create a project with an associated board
+- **`jira_create_project_with_board`** - Create a project with an associated board and admin privileges
 
 #### Issue Management
 
@@ -34,6 +34,7 @@ This project provides a Model Context Protocol (MCP) server that exposes Jira bo
 - **`jira_create_bug`** - Create a bug in a project
 - **`jira_create_issue`** - Create any type of issue with custom fields
 - **`jira_get_issue`** - Get issue details by key or ID
+- **`jira_delete_issue`** - Delete an issue by key or ID
 - **`jira_search_issues`** - Search for issues using JQL
 
 #### Backlog Management
