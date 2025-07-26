@@ -177,10 +177,13 @@ The MCP server supports two transport modes:
 ### Issue Management
 
 - `jira_get_issue_types`: Get all available issue types
+- `jira_get_project_issue_types`: Get issue types available for a specific project
 - `jira_create_user_story`: Create a user story in a project
 - `jira_create_bug`: Create a bug in a project
 - `jira_create_issue`: Create any type of issue with custom fields
 - `jira_get_issue`: Get issue details by key or ID
+- `jira_get_issue_transitions`: Get available status transitions for an issue
+- `jira_update_issue`: Update issue fields (assignee, priority, status, summary, description) and add comments
 - `jira_delete_issue`: Delete an issue by key or ID
 - `jira_search_issues`: Search for issues using JQL
 
@@ -201,6 +204,48 @@ The MCP server supports two transport modes:
 
 - `jira://boards`: List of all boards
 - `jira://board/{boardId}`: Specific board details with backlog, epics, and sprints
+
+## Usage Examples
+
+### Updating Issue Status and Assignee
+
+```typescript
+// First, get available transitions for an issue
+const transitions = await jira_get_issue_transitions({
+  issueKeyOrId: 'PROJ-123',
+});
+
+// Update the issue with new assignee, priority, and status
+const result = await jira_update_issue({
+  issueKeyOrId: 'PROJ-123',
+  assigneeAccountId: 'user123',
+  priorityId: '2', // High priority
+  transitionId: '21', // In Progress status
+  comment: 'Assigned to development team and started work',
+});
+```
+
+### Adding Comments and Changing Priority
+
+```typescript
+// Add a comment and change priority without changing status
+const result = await jira_update_issue({
+  issueKeyOrId: 'PROJ-123',
+  priorityId: '1', // Highest priority
+  comment: 'Escalated to highest priority due to customer impact',
+});
+```
+
+### Unassigning an Issue
+
+```typescript
+// Remove assignee from an issue
+const result = await jira_update_issue({
+  issueKeyOrId: 'PROJ-123',
+  unassign: true,
+  comment: 'Unassigned for review and reassignment',
+});
+```
 
 ## Troubleshooting
 
