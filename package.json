@@ -32,6 +32,8 @@
     "docker:dev": "docker-compose up --build",
     "docker:status": "./scripts/docker-status.sh",
     "docker:start": "./scripts/run-mcp.sh",
+    "docker:stop": "docker stop jira-mcp-server || true",
+    "docker:test-sse": "./scripts/test-sse.sh",
     "docker:load-env": "./scripts/load-env.sh"
   },
   "keywords": [

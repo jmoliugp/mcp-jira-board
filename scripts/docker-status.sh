@@ -35,13 +35,17 @@ fi
 
 echo ""
 
-# Check if containers are running
-if docker ps | grep -q "jira-mcp-server"; then
-    echo "✅ Running containers:"
-    docker ps | grep jira-mcp-server
-else
-    echo "ℹ️  No running containers found"
-fi
+            # Check if containers are running
+            if docker ps | grep -q "jira-mcp-server"; then
+                echo "✅ Running containers:"
+                docker ps | grep jira-mcp-server
+                echo ""
+                echo "🌐 SSE Server URL: http://localhost:3001/sse"
+                echo "📋 Cursor can connect to this URL"
+            else
+                echo "ℹ️  No running containers found"
+                echo "   Start with: pnpm docker:start"
+            fi
 
 echo ""
 

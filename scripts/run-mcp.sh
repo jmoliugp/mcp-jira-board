@@ -58,10 +58,12 @@ echo "   JIRA_BASE_URL: ${JIRA_BASE_URL:0:30}..."
 echo "   JIRA_EMAIL: ${JIRA_EMAIL:0:20}..."
 echo "   JIRA_API_TOKEN: ${JIRA_API_TOKEN:0:10}..."
 
-# Run the MCP server
-docker run -i --rm --init \
-  -e JIRA_BASE_URL="$JIRA_BASE_URL" \
-  -e JIRA_EMAIL="$JIRA_EMAIL" \
-  -e JIRA_API_TOKEN="$JIRA_API_TOKEN" \
-  -e OPENAI_API_KEY="$OPENAI_API_KEY" \
-  jira-mcp-server:latest 
+            # Run the MCP SSE server
+            docker run -d --rm --init \
+              -p 3001:3001 \
+              -e JIRA_BASE_URL="$JIRA_BASE_URL" \
+              -e JIRA_EMAIL="$JIRA_EMAIL" \
+              -e JIRA_API_TOKEN="$JIRA_API_TOKEN" \
+              -e OPENAI_API_KEY="$OPENAI_API_KEY" \
+              --name jira-mcp-server \
+              jira-mcp-server:latest 

@@ -1,254 +1,235 @@
 # Jira MCP Server
 
-A Model Context Protocol (MCP) server that provides Jira board management functionality, allowing AI assistants to interact with Jira programmatically.
+A Model Context Protocol (MCP) server that provides Jira board and backlog management functionality. This server can be run as a standalone HTTP server using Server-Sent Events (SSE) or Streamable HTTP, allowing Cursor and other MCP clients to connect to it.
 
-## 🚀 Quick Start
+## Features
 
-### 1. Setup with Docker (Recommended)
+- **Board Management**: Create, list, get, and delete Jira boards
+- **Backlog Management**: Move issues to and from backlogs
+- **Board Operations**: Get board issues, epics, sprints, and backlogs
+- **SSE/HTTP Transport**: Support for both SSE and Streamable HTTP connections
+- **Docker Support**: Easy deployment and management with Docker
+
+## Quick Start
+
+### 1. Setup Environment
 
 ```bash
-# Setup everything automatically (build, test, create .env)
-pnpm docker:build
+# Clone the repository
+git clone <repository-url>
+cd mcp-jira-board
 
-# Or manually:
-pnpm docker:test
+# Install dependencies
+pnpm install
+
+# Build the project
+pnpm build
 ```
 
 ### 2. Configure Environment Variables
 
-Create a `.env` file or set environment variables. The scripts will automatically look for the `.env` file in:
-
-- Current directory (`./.env`)
-- Parent directory (`../.env`)
-
-You can create the `.env` file manually or use the setup script:
+Create a `.env` file with your Jira credentials:
 
 ```bash
-export JIRA_BASE_URL=https://your-domain.atlassian.net
-export JIRA_EMAIL=your-email@example.com
-export JIRA_API_TOKEN=your-jira-api-token
-export OPENAI_API_KEY=your-openai-api-key
+# Jira Configuration
+JIRA_BASE_URL=https://your-domain.atlassian.net
+JIRA_EMAIL=your-email@example.com
+JIRA_API_TOKEN=your-jira-api-token
+
+# Optional Jira Settings
+JIRA_API_TIMEOUT=10000
+JIRA_API_RETRY_ATTEMPTS=3
+JIRA_API_RETRY_DELAY=1000
+JIRA_LOG_LEVEL=info
+JIRA_LOG_REQUESTS=false
+JIRA_LOG_RESPONSES=false
+JIRA_RATE_LIMIT_ENABLED=true
+JIRA_RATE_LIMIT_REQUESTS_PER_MINUTE=1000
+JIRA_ENVIRONMENT=cloud
+
+# OpenAI Configuration (optional)
+OPENAI_API_KEY=your-openai-api-key
 ```
 
-### 3. Configure Cursor
-
-1. Open Cursor
-2. Go to Settings (⌘ + ,)
-3. Search for "MCP"
-4. Set MCP Config File to: `mcp-config.json`
-5. Restart Cursor
-
-## 📦 Available Scripts
-
-### Docker Commands
-
-| Command                    | Description                               |
-| -------------------------- | ----------------------------------------- |
-| `pnpm docker:build`        | Complete setup (build, test, create .env) |
-| `pnpm docker:test`         | Test Docker container                     |
-| `pnpm docker:status`       | Check Docker status and environment       |
-| `pnpm docker:start`        | Run MCP server directly                   |
-| `pnpm docker:run`          | Run container with current env vars       |
-| `pnpm docker:load-env`     | Load environment variables from .env      |
-| `pnpm docker:compose:up`   | Start with docker-compose                 |
-| `pnpm docker:compose:down` | Stop docker-compose                       |
-| `pnpm docker:compose:logs` | View docker-compose logs                  |
-| `pnpm docker:dev`          | Development mode with rebuild             |
-| `pnpm docker:clean`        | Remove Docker image                       |
-| `pnpm docker:rebuild`      | Clean and rebuild                         |
-
-### Development Commands
-
-| Command                 | Description                    |
-| ----------------------- | ------------------------------ |
-| `pnpm build`            | Build TypeScript to JavaScript |
-| `pnpm dev`              | Start development server       |
-| `pnpm start`            | Start production server        |
-| `pnpm test:unit`        | Run unit tests                 |
-| `pnpm test:integration` | Run integration tests          |
-| `pnpm mcp:test`         | Test MCP server                |
-| `pnpm mcp:start`        | Start MCP server locally       |
-
-## 🛠️ Features
-
-### Board Management
-
-- **Get All Boards** - Retrieve all boards with filtering
-- **Create Board** - Create scrum or kanban boards
-- **Get Board Details** - Get specific board information
-- **Delete Board** - Remove boards
-
-### Issue Management
-
-- **Get Board Backlog** - Retrieve backlog issues
-- **Get Board Epics** - Get epics for a board
-- **Get Board Sprints** - Retrieve sprints
-- **Get Board Issues** - Get all issues on a board
-- **Move Issues to Board** - Add issues to boards
-
-### Backlog Management
-
-- **Move to Backlog** - Move issues to backlog
-- **Move to Board Backlog** - Move to specific board backlog
-
-### Resources
-
-- **Board Resource** - Detailed board information
-- **Boards List Resource** - List of all boards
-
-## 🔧 Configuration
-
-### Environment Variables
-
-| Variable           | Required | Description                  |
-| ------------------ | -------- | ---------------------------- |
-| `JIRA_BASE_URL`    | Yes      | Your Jira instance URL       |
-| `JIRA_EMAIL`       | Yes      | Your Jira email              |
-| `JIRA_API_TOKEN`   | Yes      | Your Jira API token          |
-| `OPENAI_API_KEY`   | Yes      | OpenAI API key               |
-| `JIRA_API_TIMEOUT` | No       | API timeout (default: 10000) |
-| `JIRA_LOG_LEVEL`   | No       | Log level (default: info)    |
-
-### Getting Jira API Token
-
-1. Go to https://id.atlassian.com/manage-profile/security/api-tokens
-2. Create a new token
-3. Copy the generated token
-
-## 🐳 Docker Usage
-
-### Quick Start
+### 3. Build and Start Docker Server
 
 ```bash
-# Setup everything (build, test, create .env)
+# Build Docker image and start SSE server
 pnpm docker:build
+
+# Start the MCP server (runs in background)
+pnpm docker:start
 
 # Check status
 pnpm docker:status
 
-# Start server
-pnpm docker:start
+# Test SSE connection
+pnpm docker:test-sse
 ```
 
-### Manual Docker Commands
+### 4. Configure Cursor
+
+Add this to your `mcp-config.json`:
+
+```json
+{
+  "mcpServers": {
+    "jira-mcp-server": {
+      "url": "http://localhost:3001/sse"
+    }
+  }
+}
+```
+
+### 5. Restart Cursor
+
+Restart Cursor to load the new MCP server configuration.
+
+## Available Commands
+
+### Docker Commands
 
 ```bash
-# Build image
-docker build -t jira-mcp-server:latest .
+# Build and setup
+pnpm docker:build          # Build Docker image and setup environment
+pnpm docker:rebuild        # Clean and rebuild Docker image
 
-# Run container
-docker run -i --rm --init \
-  -e JIRA_BASE_URL=your-url \
-  -e JIRA_EMAIL=your-email \
-  -e JIRA_API_TOKEN=your-token \
-  -e OPENAI_API_KEY=your-key \
-  jira-mcp-server:latest
+# Server management
+pnpm docker:start          # Start MCP server in background
+pnpm docker:stop           # Stop MCP server
+pnpm docker:status         # Check server status
+
+# Testing
+pnpm docker:test           # Test Docker container
+pnpm docker:test-sse       # Test SSE connection
+
+# Development
+pnpm docker:dev            # Development mode with auto-rebuild
+pnpm docker:compose:up     # Start with docker-compose
+pnpm docker:compose:down   # Stop docker-compose
+pnpm docker:compose:logs   # View logs
+
+# Cleanup
+pnpm docker:clean          # Remove Docker image
 ```
 
-### Docker Compose
+### Development Commands
 
 ```bash
-# Start services
-docker-compose up -d
+# Build and run locally
+pnpm build                 # Build TypeScript
+pnpm start                 # Run locally (stdio mode)
+pnpm dev                   # Development mode with watch
 
-# View logs
-docker-compose logs jira-mcp-server
+# Testing
+pnpm test:unit             # Run unit tests
+pnpm test:integration      # Run integration tests
+pnpm test:all              # Run all tests
 
-# Stop services
-docker-compose down
+# MCP testing
+pnpm mcp:test              # Test MCP server locally
+pnpm mcp:start             # Start MCP server locally (stdio)
 ```
 
-## 📁 Project Structure
+## Architecture
 
-```
-mcp-jira-board/
-├── src/
-│   ├── mcps/           # MCP server implementation
-│   ├── services/       # Jira API services
-│   └── utils/          # Utilities and helpers
-├── scripts/            # Build and utility scripts
-├── integration-tests/  # Integration tests
-├── Dockerfile          # Docker configuration
-├── docker-compose.yml  # Docker Compose config
-├── mcp-config.json     # MCP configuration for Cursor
-└── package.json        # Project dependencies
-```
+### Transport Modes
 
-## 🧪 Testing
+The MCP server supports two transport modes:
 
-```bash
-# Unit tests
-pnpm test:unit
+1. **SSE (Server-Sent Events)**: Used for HTTP-based connections
+   - Endpoint: `http://localhost:3001/sse`
+   - Suitable for web-based MCP clients
 
-# Integration tests
-pnpm test:integration
+2. **Streamable HTTP**: Alternative HTTP transport
+   - Endpoint: `http://localhost:3001/mcp`
+   - More efficient for some clients
 
-# Test Docker container
-pnpm docker:test
+3. **Stdio**: Traditional MCP transport
+   - Used for direct process communication
+   - Available via `pnpm mcp:start`
 
-# Test MCP server
-pnpm mcp:test
-```
+### Server Modes
 
-## 🔍 Troubleshooting
+- **Standalone SSE Server**: Runs as HTTP server on port 3001
+- **Docker Container**: Runs in Docker with port mapping
+- **Local Development**: Runs directly with stdio transport
+
+## API Tools
+
+### Board Management
+
+- `jira_get_all_boards`: Retrieve all boards with optional filtering
+- `jira_create_board`: Create a new scrum or kanban board
+- `jira_get_board_by_id`: Get board details by ID
+- `jira_delete_board`: Delete a board by ID
+
+### Board Operations
+
+- `jira_get_board_backlog`: Get issues in board backlog
+- `jira_get_board_epics`: Get epics for a board
+- `jira_get_board_sprints`: Get sprints for a board
+- `jira_get_board_issues`: Get issues for a board
+- `jira_move_issues_to_board`: Move issues to a board
+
+### Backlog Management
+
+- `jira_move_issues_to_backlog`: Move issues to backlog
+- `jira_move_issues_to_backlog_for_board`: Move issues to specific board backlog
+
+### Resources
+
+- `jira://boards`: List of all boards
+- `jira://board/{boardId}`: Specific board details with backlog, epics, and sprints
+
+## Troubleshooting
 
 ### Common Issues
 
-1. **Environment Variables Not Set**
-
-   ```bash
-   pnpm docker:status  # Check what's missing
-   ```
-
-2. **Docker Image Not Found**
-
-   ```bash
-   pnpm docker:build   # Rebuild the image
-   ```
-
-3. **MCP Connection Issues**
-   - Restart Cursor
-   - Check MCP configuration
-   - Verify environment variables
-
-4. **Jira API Errors**
-   - Verify credentials
-   - Check Jira instance URL
-   - Ensure API token has correct permissions
+1. **Server not starting**: Check Docker is running and port 3001 is available
+2. **Connection refused**: Ensure the server is running with `pnpm docker:status`
+3. **Authentication errors**: Verify Jira credentials in `.env` file
+4. **Cursor not connecting**: Restart Cursor after updating `mcp-config.json`
 
 ### Debug Commands
 
 ```bash
-# Check Docker status
+# Check server logs
+docker logs jira-mcp-server
+
+# Test connectivity
+curl http://localhost:3001/sse
+
+# Check environment variables
 pnpm docker:status
-
-# Load environment variables
-pnpm docker:load-env
-
-# View container logs
-pnpm docker:compose:logs
-
-# Test container manually
-pnpm docker:test
-
-# Run server directly
-pnpm docker:start
 ```
 
-## 📚 Documentation
+## Development
 
-- [Docker Setup](DOCKER.md) - Detailed Docker documentation
-- [MCP Server Guide](MCP-SERVER.md) - MCP server documentation
-- [Integration Tests](integration-tests/README.md) - Testing guide
+### Project Structure
 
-## 🤝 Contributing
+```
+src/
+├── mcps/
+│   ├── index.ts          # Stdio MCP server
+│   └── server-sse.ts     # SSE/HTTP MCP server
+├── services/
+│   └── jira/
+│       ├── board.ts      # Board management
+│       └── backlog.ts    # Backlog management
+└── utils/
+    ├── config.ts         # Configuration
+    ├── log.ts           # Logging
+    └── error.ts         # Error handling
+```
 
-1. Fork the repository
-2. Create a feature branch
-3. Make your changes
-4. Add tests
-5. Submit a pull request
+### Adding New Tools
 
-## 📄 License
+1. Add tool registration in `src/mcps/server-sse.ts`
+2. Implement service functions in `src/services/jira/`
+3. Add tests in `src/services/jira/*.test.ts`
+4. Update documentation
 
-MIT License - see LICENSE file for details.
+## License
+
+MIT
