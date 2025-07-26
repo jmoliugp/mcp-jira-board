@@ -52,10 +52,24 @@ export const jiraApiEndpoint = {
     getProjectRoles: '/rest/api/3/project/%s/role',
     getProjectRole: '/rest/api/3/project/%s/role/%s',
     getProjectUsers: '/rest/api/3/project/%s/role/%s',
+    getProjectFieldConfiguration: '/rest/api/3/fieldconfiguration/project/%s',
+    getProjectScreenSchemes: '/rest/api/3/screenscheme/project/%s',
+    getProjectFieldConfigurationSchemes: '/rest/api/3/fieldconfigurationscheme/project/%s',
   },
   user: {
     getCurrentUser: '/rest/api/3/myself',
   },
+  issue: {
+    createIssue: '/rest/api/3/issue',
+    getIssue: '/rest/api/3/issue/%s',
+    updateIssue: '/rest/api/3/issue/%s',
+    deleteIssue: '/rest/api/3/issue/%s',
+    searchIssues: '/rest/api/3/search',
+    getIssueTypes: '/rest/api/3/issuetype',
+    getIssueType: '/rest/api/3/issuetype/%s',
+    getIssueTransitions: '/rest/api/3/issue/%s/transitions',
+  },
+  // Field endpoints removed to simplify the codebase
 };
 
 export const axiosClient = axios.create({

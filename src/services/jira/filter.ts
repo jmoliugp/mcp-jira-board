@@ -245,11 +245,28 @@ export const createFilter = async (input: CreateFilterInput): Promise<CreateFilt
 export const getOrCreateDefaultFilter = async (): Promise<number> => {
   try {
     // First, try to find an existing filter that includes all issues
+    log.info(`🔍 Getting user filters...`);
     const myFilters = await getMyFilters();
-    const allIssuesFilter = myFilters.values.find(
-      filter =>
-        filter.jql.toLowerCase().includes('order by') && filter.jql.toLowerCase().includes('rank')
-    );
+
+    // Check if values is an array
+    if (!Array.isArray(myFilters.values)) {
+      log.warn(`⚠️ myFilters.values is not an array: ${typeof myFilters.values}`);
+      log.info(`📋 myFilters structure: ${JSON.stringify(myFilters, null, 2)}`);
+      throw new Error('Invalid filter response structure');
+    }
+
+    log.info(`📋 Found ${myFilters.values.length} user filters`);
+
+    // Look for a filter that includes all issues (simple JQL)
+    const allIssuesFilter = myFilters.values.find(filter => {
+      const jql = filter.jql.toLowerCase();
+      return (
+        jql.includes('order by') ||
+        jql.includes('rank') ||
+        jql === '' ||
+        jql === 'order by created desc'
+      );
+    });
 
     if (allIssuesFilter) {
       log.info(
@@ -258,12 +275,12 @@ export const getOrCreateDefaultFilter = async (): Promise<number> => {
       return parseInt(allIssuesFilter.id);
     }
 
-    // If no suitable filter exists, create one
+    // If no suitable filter exists, create one with a simple JQL
     log.info(`🔧 Creating default filter for board creation...`);
     const newFilter = await createFilter({
       name: 'MCP Default Board Filter',
       description: 'Default filter created by MCP server for board creation',
-      jql: 'ORDER BY Rank ASC',
+      jql: 'ORDER BY created DESC',
       favourite: false,
     });
 
@@ -271,7 +288,24 @@ export const getOrCreateDefaultFilter = async (): Promise<number> => {
     return parseInt(newFilter.id);
   } catch (error) {
     log.error(`❌ Error getting/creating default filter: ${error}`);
-    // Fallback to a common filter ID (this might not work in all cases)
-    return 10000;
+    log.error(`❌ Error details: ${JSON.stringify(error, null, 2)}`);
+
+    // Try to create a simple filter as fallback
+    try {
+      log.info(`🔄 Trying to create fallback filter...`);
+      const fallbackFilter = await createFilter({
+        name: 'MCP Fallback Filter',
+        description: 'Fallback filter for board creation',
+        jql: 'ORDER BY created DESC',
+        favourite: false,
+      });
+
+      log.info(`✅ Created fallback filter: ${fallbackFilter.name} (ID: ${fallbackFilter.id})`);
+      return parseInt(fallbackFilter.id);
+    } catch (fallbackError) {
+      log.error(`❌ Fallback filter creation also failed: ${fallbackError}`);
+      // Last resort: return a common filter ID (this might not work)
+      return 10000;
+    }
   }
 };

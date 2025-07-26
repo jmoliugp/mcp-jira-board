@@ -23,7 +23,6 @@
     "mcp:start": "tsx src/mcps/index.ts",
     "docker:build": "./scripts/docker-build.sh",
     "docker:test": "./scripts/test-docker.sh",
-    "docker:run": "docker run -i --rm --init -e JIRA_BASE_URL=${JIRA_BASE_URL} -e JIRA_EMAIL=${JIRA_EMAIL} -e JIRA_API_KEY=${JIRA_API_TOKEN} -e OPENAI_API_KEY=${OPENAI_API_KEY} jira-mcp-server:latest",
     "docker:compose:up": "docker-compose up",
     "docker:compose:down": "docker-compose down",
     "docker:compose:logs": "docker-compose logs jira-mcp-server",
@@ -32,9 +31,7 @@
     "docker:dev": "docker-compose up --build",
     "docker:status": "./scripts/docker-status.sh",
     "docker:start": "./scripts/run-mcp.sh",
-    "docker:stop": "docker stop jira-mcp-server || true",
-    "docker:test-sse": "./scripts/test-sse.sh",
-    "docker:load-env": "./scripts/load-env.sh"
+    "docker:stop": "docker stop jira-mcp-server || true"
   },
   "keywords": [
     "typescript",

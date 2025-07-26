@@ -167,12 +167,31 @@ The MCP server supports two transport modes:
 
 ### Project Management
 
-- `jira_create_project`: Create a new Jira project
+- `jira_create_project`: Create a new Jira project with automatic admin privileges
 - `jira_get_all_projects`: Retrieve all projects with optional filtering
 - `jira_get_project`: Get project details by ID or key
 - `jira_update_project`: Update project information
 - `jira_delete_project`: Delete a project
-- `jira_create_project_with_board`: Create a project with an associated board
+- `jira_create_project_with_board`: Create a project with an associated board and admin privileges
+
+### Issue Management
+
+- `jira_get_issue_types`: Get all available issue types
+- `jira_get_project_issue_types`: Get issue types available for a specific project
+- `jira_create_user_story`: Create a user story in a project
+- `jira_create_bug`: Create a bug in a project
+- `jira_create_issue`: Create any type of issue
+- `jira_get_issue`: Get issue details by key or ID
+- `jira_get_issue_transitions`: Get available status transitions for an issue
+- `jira_update_issue`: Update issue fields (assignee, priority, status, summary, description) and add comments
+- `jira_delete_issue`: Delete an issue by key or ID
+- `jira_search_issues`: Search for issues using JQL
+- `jira_validate_jql`: Validate JQL queries and get suggestions
+
+### AI Story Estimation
+
+- `jira_ai_estimate_stories_in_project`: AI-powered automatic estimation of unestimated stories with default story points
+- `jira_get_project_ai_estimation_stats`: Get AI estimation statistics for a project
 
 ### Board Operations
 
@@ -191,6 +210,95 @@ The MCP server supports two transport modes:
 
 - `jira://boards`: List of all boards
 - `jira://board/{boardId}`: Specific board details with backlog, epics, and sprints
+
+## Usage Examples
+
+### Updating Issue Status and Assignee
+
+```typescript
+// First, get available transitions for an issue
+const transitions = await jira_get_issue_transitions({
+  issueKeyOrId: 'PROJ-123',
+});
+
+// Update the issue with new assignee, priority, and status
+const result = await jira_update_issue({
+  issueKeyOrId: 'PROJ-123',
+  assigneeAccountId: 'user123',
+  priorityId: '2', // High priority
+  transitionId: '21', // In Progress status
+  comment: 'Assigned to development team and started work',
+});
+```
+
+### Adding Comments and Changing Priority
+
+```typescript
+// Add a comment and change priority without changing status
+const result = await jira_update_issue({
+  issueKeyOrId: 'PROJ-123',
+  priorityId: '1', // Highest priority
+  comment: 'Escalated to highest priority due to customer impact',
+});
+```
+
+### Unassigning an Issue
+
+```typescript
+// Remove assignee from an issue
+const result = await jira_update_issue({
+  issueKeyOrId: 'PROJ-123',
+  unassign: true,
+  comment: 'Unassigned for review and reassignment',
+});
+```
+
+### AI Story Estimation
+
+```typescript
+// AI-estimate all unestimated stories in a project with default 3 story points
+const result = await jira_ai_estimate_stories_in_project({
+  projectKey: 'FITPULSE',
+});
+
+// AI-estimate with custom story points and label
+const result = await jira_ai_estimate_stories_in_project({
+  projectKey: 'FITPULSE',
+  defaultStoryPoints: 5,
+  estimationLabel: 'ai-estimated',
+});
+
+// Get AI estimation statistics for a project
+const stats = await jira_get_project_ai_estimation_stats({
+  projectKey: 'FITPULSE',
+});
+```
+
+// Field Configuration and Custom Fields tools have been removed to simplify the codebase
+
+### JQL Best Practices
+
+```typescript
+// Validate JQL before searching
+const validation = await jira_validate_jql({
+  jql: 'project = FITPULSE AND "Story Points" is EMPTY',
+});
+
+// Use recommended queries
+const issues = await jira_search_issues({
+  jql: 'project = FITPULSE AND timeoriginalestimate is EMPTY',
+  maxResults: 10,
+});
+```
+
+**Common JQL Issues:**
+
+- Use `timeoriginalestimate` instead of `"Story Points"`
+- Use `is EMPTY` for standard fields, `is null` for custom fields
+- Always start with `project = PROJECT_KEY`
+- Avoid custom field names in quotes unless they exist
+
+````
 
 ## Troubleshooting
 
@@ -212,7 +320,7 @@ curl http://localhost:3001/sse
 
 # Check environment variables
 pnpm docker:status
-```
+````
 
 ## Development
 

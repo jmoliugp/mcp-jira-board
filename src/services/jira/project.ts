@@ -140,20 +140,60 @@ export interface UpdateProjectInput {
 }
 
 /**
- * Create a new project.
+ * Create a new project with automatic admin privileges.
+ * This function ensures that the current user becomes the project lead
+ * and has full administrative permissions for all operations.
  * @param input - Project creation data
  * @returns The created project
  */
 export const createProject = async (input: CreateProjectInput): Promise<CreateProjectResponse> => {
   const start = performance.now();
   try {
+    // Step 1: Get current user to ensure admin privileges
+    log.info('🔧 Getting current user for admin privileges...');
+    const currentUser = await getCurrentUser();
+    log.info(`✅ Current user: ${currentUser.displayName} (${currentUser.accountId})`);
+
+    // Step 2: Prepare project input with admin privileges
+    const adminProjectInput: CreateProjectInput = {
+      ...input,
+      // Always set the current user as project lead for admin privileges
+      leadAccountId: currentUser.accountId,
+      // Set assignee type to UNASSIGNED by default, unless explicitly specified
+      assigneeType: input.assigneeType || 'UNASSIGNED',
+    };
+
+    log.info(`🔧 Creating project with admin privileges:`);
+    log.info(`   - Project Key: ${adminProjectInput.key}`);
+    log.info(`   - Project Name: ${adminProjectInput.name}`);
+    log.info(`   - Project Lead: ${currentUser.displayName} (${currentUser.accountId})`);
+    log.info(`   - Assignee Type: ${adminProjectInput.assigneeType}`);
+
+    // Step 3: Create the project with admin privileges
     const { data } = await axiosClient.post<CreateProjectResponse>(
       jiraApiEndpoint.project.createProject,
-      input
+      adminProjectInput
     );
 
     const end = performance.now();
     log.info(`⏱️ createProject executed in ${(end - start).toFixed(2)}ms`);
+    log.info(`✅ Project created with admin privileges: ${data.key} (${data.name})`);
+    log.info(`🎉 You now have FULL ADMIN PERMISSIONS for all operations in this project!`);
+
+    // Debug: Log the full project response to understand the structure
+    log.info(
+      `🔍 Project response structure: ${JSON.stringify(
+        {
+          key: data.key,
+          name: data.name,
+          id: data.id,
+          projectTypeKey: data.projectTypeKey,
+        },
+        null,
+        2
+      )}`
+    );
+
     return data;
   } catch (error) {
     const err = error as AxiosError;
@@ -322,8 +362,9 @@ export const deleteProject = async (projectIdOrKey: string): Promise<void> => {
 };
 
 /**
- * Create a project with an associated board.
- * This is a convenience function that creates both a project and a board.
+ * Create a project with an associated board and automatic admin privileges.
+ * This is a convenience function that creates both a project (with admin privileges)
+ * and a board. The current user will be the project lead with full permissions.
  * @param projectInput - Project creation data
  * @param boardName - Name for the associated board
  * @param boardType - Type of board ('scrum' or 'kanban')
@@ -333,20 +374,114 @@ export const createProjectWithBoard = async (
   projectInput: CreateProjectInput,
   boardName: string,
   boardType: 'scrum' | 'kanban'
-): Promise<{ project: CreateProjectResponse; board?: any }> => {
+): Promise<{ project: CreateProjectResponse; board: any }> => {
   const start = performance.now();
   try {
-    // First create the project
+    log.info(`🔧 Creating project with board and admin privileges:`);
+    log.info(`   - Project: ${projectInput.key} (${projectInput.name})`);
+    log.info(`   - Board: ${boardName} (${boardType})`);
+
+    // First create the project (this will automatically have admin privileges)
+    log.info(`📤 Creating project...`);
     const project = await createProject(projectInput);
+    log.info(`✅ Project created successfully: ${project.key} (${project.name})`);
 
-    // Then create a board for the project
-    // Note: This would require importing the board service
-    // For now, we'll return just the project
-    const end = performance.now();
-    log.info(`⏱️ createProjectWithBoard executed in ${(end - start).toFixed(2)}ms`);
+    try {
+      // Import board service and filter service
+      log.info(`📦 Importing board and filter services...`);
+      const { createBoard } = await import('./board.js');
+      const { createFilter } = await import('./filter.js');
+      log.info(`✅ Services imported successfully`);
 
-    return { project };
+      // Create a project-specific filter for the board
+      log.info(`🔍 Creating project-specific filter...`);
+
+      // Use the original project name from input if the response name is undefined
+      const projectName = project.name || projectInput.name;
+      log.info(
+        `🔍 Using project name for filter: "${projectName}" (response name: "${project.name}")`
+      );
+
+      // Try to create a unique filter name to avoid conflicts
+      const baseFilterName = `${projectName} Board Filter`;
+      let filterName = baseFilterName;
+      let projectFilter;
+
+      try {
+        projectFilter = await createFilter({
+          name: filterName,
+          description: `Filter for ${projectName} board - shows all issues in this project`,
+          jql: `project = ${project.key} ORDER BY created DESC`,
+          favourite: false,
+        });
+        log.info(`✅ Project filter created: ${projectFilter.name} (ID: ${projectFilter.id})`);
+      } catch (filterError) {
+        // If filter name already exists, try with a timestamp
+        const isNameConflict =
+          filterError instanceof Error &&
+          (filterError.message.includes('Filter with same name already exists') ||
+            (filterError as any).context?.data?.errors?.filterName?.includes('already exists'));
+
+        if (isNameConflict) {
+          log.warn(`⚠️ Filter name "${filterName}" already exists, trying with timestamp...`);
+          const timestamp = new Date().toISOString().replace(/[:.]/g, '-').slice(0, 19);
+          filterName = `${baseFilterName} (${timestamp})`;
+
+          projectFilter = await createFilter({
+            name: filterName,
+            description: `Filter for ${projectName} board - shows all issues in this project`,
+            jql: `project = ${project.key} ORDER BY created DESC`,
+            favourite: false,
+          });
+          log.info(
+            `✅ Project filter created with timestamp: ${projectFilter.name} (ID: ${projectFilter.id})`
+          );
+        } else {
+          // Log the full error context for debugging
+          log.error(`❌ Filter creation error: ${filterError}`);
+          if (filterError instanceof Error && 'context' in filterError) {
+            log.error(
+              `❌ Filter error context: ${JSON.stringify((filterError as any).context, null, 2)}`
+            );
+          }
+          throw filterError;
+        }
+      }
+
+      // Create the board for the project using the project-specific filter
+      const boardInput = {
+        name: boardName,
+        type: boardType,
+        filterId: parseInt(projectFilter.id),
+        location: {
+          type: 'project' as const,
+          projectKeyOrId: project.key,
+        },
+      };
+
+      log.info(`📤 Creating board with input: ${JSON.stringify(boardInput)}`);
+      const board = await createBoard(boardInput);
+      log.info(`✅ Board created successfully: ${board.name} (ID: ${board.id})`);
+
+      const end = performance.now();
+      log.info(`⏱️ createProjectWithBoard executed in ${(end - start).toFixed(2)}ms`);
+      log.info(`✅ Project with board created successfully with admin privileges!`);
+      log.info(`🎉 Board "${board.name}" (ID: ${board.id}) created for project "${project.name}"`);
+
+      return { project, board };
+    } catch (boardError) {
+      log.error(`❌ Error creating board: ${boardError}`);
+      log.error(`❌ Board error details: ${JSON.stringify(boardError, null, 2)}`);
+
+      // If board creation fails, still return the project
+      log.warn(`⚠️ Returning project without board due to board creation error`);
+      log.info(`💡 You can manually create a board later using the project key: ${project.key}`);
+      return { project, board: null };
+    }
   } catch (error) {
+    log.error(`❌ Error in createProjectWithBoard: ${error}`);
+    log.error(`❌ Error details: ${JSON.stringify(error, null, 2)}`);
+
     const err = error as AxiosError;
     const status = err.response?.status;
     const data = err.response?.data;
