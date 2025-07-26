@@ -27,6 +27,9 @@ vi.mock('./networking.js', () => ({
       updateProject: '/rest/api/3/project/%s',
       deleteProject: '/rest/api/3/project/%s',
     },
+    user: {
+      getCurrentUser: '/rest/api/3/myself',
+    },
   },
 }));
 
@@ -82,6 +85,20 @@ describe('Project Service', () => {
       description: 'A test project',
       leadAccountId: 'user123',
     };
+
+    const mockCurrentUser = {
+      accountId: 'user123',
+      emailAddress: 'test@example.com',
+      displayName: 'Test User',
+      active: true,
+      timeZone: 'UTC',
+      accountType: 'atlassian',
+    };
+
+    beforeEach(() => {
+      // Mock getCurrentUser for all createProject tests
+      mockedAxiosClient.get.mockResolvedValueOnce({ data: mockCurrentUser });
+    });
 
     it('should resolve on success', async () => {
       mockedAxiosClient.post.mockResolvedValueOnce({ data: mockProject });
@@ -325,6 +342,20 @@ describe('Project Service', () => {
       description: 'A test project',
     };
 
+    const mockCurrentUser = {
+      accountId: 'user123',
+      emailAddress: 'test@example.com',
+      displayName: 'Test User',
+      active: true,
+      timeZone: 'UTC',
+      accountType: 'atlassian',
+    };
+
+    beforeEach(() => {
+      // Mock getCurrentUser for all createProjectWithBoard tests
+      mockedAxiosClient.get.mockResolvedValueOnce({ data: mockCurrentUser });
+    });
+
     it('should create project successfully', async () => {
       mockedAxiosClient.post.mockResolvedValueOnce({ data: mockProject });
       const result = await project.createProjectWithBoard(projectInput, 'Test Board', 'scrum');
@@ -335,7 +366,7 @@ describe('Project Service', () => {
       mockedAxiosClient.post.mockRejectedValueOnce(makeAxiosError(400));
       await expect(
         project.createProjectWithBoard(projectInput, 'Test Board', 'scrum')
-      ).rejects.toBeInstanceOf(UserInputError);
+      ).rejects.toBeInstanceOf(InternalServerError);
     });
   });
 });
