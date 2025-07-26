@@ -1,5 +1,3 @@
-**Prompt:**
-
 Based on the following project requirements, create the corresponding Jira user stories for the **"FitPulse Landing Page"** project.
 
 For each story, follow this structure:
