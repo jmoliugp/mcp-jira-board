@@ -180,7 +180,7 @@ The MCP server supports two transport modes:
 - `jira_get_project_issue_types`: Get issue types available for a specific project
 - `jira_create_user_story`: Create a user story in a project
 - `jira_create_bug`: Create a bug in a project
-- `jira_create_issue`: Create any type of issue with custom fields
+- `jira_create_issue`: Create any type of issue
 - `jira_get_issue`: Get issue details by key or ID
 - `jira_get_issue_transitions`: Get available status transitions for an issue
 - `jira_update_issue`: Update issue fields (assignee, priority, status, summary, description) and add comments
@@ -273,43 +273,7 @@ const stats = await jira_get_project_ai_estimation_stats({
 });
 ```
 
-### Field Configuration
-
-```typescript
-// Check if Original Estimate field is enabled in a project
-const fieldCheck = await jira_check_field_configuration({
-  projectKey: 'FITPULSE',
-  fieldId: 'timeoriginalestimate',
-});
-
-// Attempt to enable Original Estimate field in a project
-const enableResult = await jira_attempt_enable_field({
-  projectKey: 'FITPULSE',
-  fieldId: 'timeoriginalestimate',
-});
-```
-
-### Custom Fields
-
-```typescript
-// Create a custom story points field
-const customField = await jira_create_custom_field({
-  name: 'AI Story Points',
-  description: 'Story points for AI-powered estimation',
-  type: 'com.atlassian.jira.plugin.system.customfieldtypes:number',
-});
-
-// Find an existing custom field
-const field = await jira_find_custom_field({
-  fieldName: 'AI Story Points',
-});
-
-// Ensure a story points field exists for a project
-const storyPointsField = await jira_ensure_story_points_field({
-  projectKey: 'FITPULSE',
-  fieldName: 'AI Story Points',
-});
-```
+// Field Configuration and Custom Fields tools have been removed to simplify the codebase
 
 ````
 
