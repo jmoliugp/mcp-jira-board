@@ -40,7 +40,7 @@ export interface EstimateStoriesParams {
  * @returns A story point value from the Fibonacci sequence
  */
 function storyAiEstimation(): number {
-  const fibonacciSequence = [1, 2, 3, 5, 8, 13, 21];
+  const fibonacciSequence = [1, 2, 3, 5, 8];
 
   const randomIndex = Math.floor(Math.random() * fibonacciSequence.length);
   const estimatedPoints = fibonacciSequence[randomIndex] || 1;
