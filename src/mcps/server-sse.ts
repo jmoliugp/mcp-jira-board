@@ -8,6 +8,7 @@ import * as backlogService from '../services/jira/backlog.js';
 import * as boardService from '../services/jira/board.js';
 import * as filterService from '../services/jira/filter.js';
 import * as projectService from '../services/jira/project.js';
+import * as issueService from '../services/jira/issue.js';
 import { Logger } from '../utils/log.js';
 
 // Import Jira services
@@ -37,7 +38,10 @@ server.tool(
     log.info(`🔧 Tool 'jira_get_all_boards' called with params: ${JSON.stringify(params)}`);
     log.info(`🔍 Params type: ${typeof params}, keys: ${params ? Object.keys(params) : 'null'}`);
     try {
-      const result = await boardService.getAllBoards(params);
+      const filteredParams = Object.fromEntries(
+        Object.entries(params).filter(([, value]) => value !== undefined)
+      );
+      const result = await boardService.getAllBoards(filteredParams);
 
       log.info(`✅ Retrieved ${result.values.length} boards`);
       log.info(`📤 Returning result to Cursor...`);
@@ -73,7 +77,12 @@ server.tool(
         name: params['name'],
         type: params['type'],
         filterId: defaultFilterId,
-        location: params['location'],
+        location: params['location']
+          ? {
+              type: params['location'].type,
+              projectKeyOrId: params['location'].projectKeyOrId || '',
+            }
+          : undefined,
       };
 
       log.info(`📤 Sending to boardService.createBoard: ${JSON.stringify(input)}`);
@@ -257,7 +266,10 @@ server.tool(
     log.info(`🔧 Tool 'jira_update_project' called with params: ${JSON.stringify(params)}`);
     try {
       const { projectIdOrKey, ...updateData } = params;
-      const input: projectService.UpdateProjectInput = updateData;
+      // Filter out undefined values to satisfy TypeScript strict mode
+      const input: projectService.UpdateProjectInput = Object.fromEntries(
+        Object.entries(updateData).filter(([, value]) => value !== undefined)
+      );
 
       const result = await projectService.updateProject(projectIdOrKey, input);
       log.info(`✅ Updated project: ${result.name} (Key: ${result.key})`);
@@ -394,8 +406,8 @@ server.tool(
     log.info(`🔧 Tool 'jira_get_board_backlog' called with params: ${JSON.stringify(params)}`);
     try {
       const result = await boardService.getBoardBacklog(params['boardId'], {
-        startAt: params['startAt'],
-        maxResults: params['maxResults'],
+        ...(params['startAt'] !== undefined && { startAt: params['startAt'] }),
+        ...(params['maxResults'] !== undefined && { maxResults: params['maxResults'] }),
       });
       log.info(`✅ Retrieved ${result.issues.length} backlog issues`);
       return {
@@ -419,8 +431,8 @@ server.tool(
     log.info(`🔧 Tool 'jira_get_board_epics' called with params: ${JSON.stringify(params)}`);
     try {
       const result = await boardService.getBoardEpics(params['boardId'], {
-        startAt: params['startAt'],
-        maxResults: params['maxResults'],
+        ...(params['startAt'] !== undefined && { startAt: params['startAt'] }),
+        ...(params['maxResults'] !== undefined && { maxResults: params['maxResults'] }),
       });
       log.info(`✅ Retrieved ${result.values.length} epics`);
       return {
@@ -445,9 +457,9 @@ server.tool(
     log.info(`🔧 Tool 'jira_get_board_sprints' called with params: ${JSON.stringify(params)}`);
     try {
       const result = await boardService.getBoardSprints(params['boardId'], {
-        startAt: params['startAt'],
-        maxResults: params['maxResults'],
-        state: params['state'],
+        ...(params['startAt'] !== undefined && { startAt: params['startAt'] }),
+        ...(params['maxResults'] !== undefined && { maxResults: params['maxResults'] }),
+        ...(params['state'] !== undefined && { state: params['state'] }),
       });
       log.info(`✅ Retrieved ${result.values.length} sprints`);
       return {
@@ -568,7 +580,11 @@ server.tool(
   async params => {
     log.info(`🔧 Tool 'jira_search_filters' called with params: ${JSON.stringify(params)}`);
     try {
-      const result = await filterService.searchFilters(params);
+      // Filter out undefined values to satisfy TypeScript strict mode
+      const filteredParams = Object.fromEntries(
+        Object.entries(params).filter(([, value]) => value !== undefined)
+      );
+      const result = await filterService.searchFilters(filteredParams);
       log.info(`✅ Retrieved ${result.values.length} filters from search`);
       return {
         content: [{ type: 'text', text: JSON.stringify(result, null, 2) }],
@@ -637,6 +653,242 @@ server.tool(
       };
     } catch (error) {
       log.error(`❌ Error in jira_move_issues_to_backlog_for_board: ${error}`);
+      throw error;
+    }
+  }
+);
+
+// Issue Management Tools
+
+server.tool('jira_get_issue_types', {}, async () => {
+  log.info(`🔧 Tool 'jira_get_issue_types' called`);
+  try {
+    const result = await issueService.getIssueTypes();
+    log.info(`✅ Retrieved ${result.values.length} issue types`);
+    return {
+      content: [{ type: 'text', text: JSON.stringify(result, null, 2) }],
+    };
+  } catch (error) {
+    log.error(`❌ Error in jira_get_issue_types: ${error}`);
+    throw error;
+  }
+});
+
+server.tool(
+  'jira_create_user_story',
+  {
+    projectKey: z.string(),
+    summary: z.string(),
+    description: z.string().optional(),
+    assigneeAccountId: z.string().optional(),
+    storyPoints: z.number().optional(),
+    labels: z.array(z.string()).optional(),
+  },
+  async params => {
+    log.info(`🔧 Tool 'jira_create_user_story' called with params: ${JSON.stringify(params)}`);
+    try {
+      const result = await issueService.createUserStory(
+        params['projectKey'],
+        params['summary'],
+        params['description'],
+        params['assigneeAccountId'],
+        params['storyPoints'],
+        params['labels']
+      );
+      log.info(`✅ Created user story: ${result.key}`);
+      return {
+        content: [{ type: 'text', text: JSON.stringify(result, null, 2) }],
+      };
+    } catch (error) {
+      log.error(`❌ Error in jira_create_user_story: ${error}`);
+      throw error;
+    }
+  }
+);
+
+server.tool(
+  'jira_create_bug',
+  {
+    projectKey: z.string(),
+    summary: z.string(),
+    description: z.string().optional(),
+    assigneeAccountId: z.string().optional(),
+    priority: z.string().optional(),
+    labels: z.array(z.string()).optional(),
+  },
+  async params => {
+    log.info(`🔧 Tool 'jira_create_bug' called with params: ${JSON.stringify(params)}`);
+    try {
+      const result = await issueService.createBug(
+        params['projectKey'],
+        params['summary'],
+        params['description'],
+        params['assigneeAccountId'],
+        params['priority'],
+        params['labels']
+      );
+      log.info(`✅ Created bug: ${result.key}`);
+      return {
+        content: [{ type: 'text', text: JSON.stringify(result, null, 2) }],
+      };
+    } catch (error) {
+      log.error(`❌ Error in jira_create_bug: ${error}`);
+      throw error;
+    }
+  }
+);
+
+server.tool(
+  'jira_create_issue',
+  {
+    projectKey: z.string(),
+    summary: z.string(),
+    issueTypeId: z.string(),
+    description: z.string().optional(),
+    assigneeAccountId: z.string().optional(),
+    reporterAccountId: z.string().optional(),
+    priority: z.string().optional(),
+    labels: z.array(z.string()).optional(),
+    components: z.array(z.string()).optional(),
+    fixVersions: z.array(z.string()).optional(),
+  },
+  async params => {
+    log.info(`🔧 Tool 'jira_create_issue' called with params: ${JSON.stringify(params)}`);
+    try {
+      // Validate issue type ID is numeric
+      const issueTypeId = params['issueTypeId'];
+      if (!/^\d+$/.test(issueTypeId)) {
+        throw new Error(`Invalid issue type ID: ${issueTypeId}. Must be a numeric ID.`);
+      }
+
+      const fields: issueService.IssueField = {
+        summary: params['summary'],
+        project: {
+          key: params['projectKey'],
+        },
+        issuetype: {
+          id: issueTypeId,
+        },
+      };
+
+      if (params['description']) {
+        fields.description = params['description'];
+      }
+
+      if (params['assigneeAccountId']) {
+        fields.assignee = {
+          accountId: params['assigneeAccountId'],
+        };
+      }
+
+      if (params['reporterAccountId']) {
+        fields.reporter = {
+          accountId: params['reporterAccountId'],
+        };
+      }
+
+      if (params['priority']) {
+        fields.priority = {
+          id: params['priority'],
+        };
+      }
+
+      if (params['labels'] && params['labels'].length > 0) {
+        fields.labels = params['labels'];
+      }
+
+      if (params['components'] && params['components'].length > 0) {
+        fields.components = params['components'].map(id => ({ id }));
+      }
+
+      if (params['fixVersions'] && params['fixVersions'].length > 0) {
+        fields.fixVersions = params['fixVersions'].map(id => ({ id }));
+      }
+
+      log.info(`📤 Creating issue with fields: ${JSON.stringify(fields, null, 2)}`);
+      const result = await issueService.createIssue({ fields });
+      log.info(`✅ Created issue: ${result.key}`);
+      return {
+        content: [{ type: 'text', text: JSON.stringify(result, null, 2) }],
+      };
+    } catch (error) {
+      log.error(`❌ Error in jira_create_issue: ${error}`);
+      // Add more detailed error information
+      if (error instanceof Error) {
+        log.error(`❌ Error message: ${error.message}`);
+        log.error(`❌ Error stack: ${error.stack}`);
+
+        // If it's a UserInputError, provide more context
+        if (error.message.includes('Invalid input for createIssue')) {
+          log.error(
+            `❌ This usually means the issue type ID '${params['issueTypeId']}' is not valid for project '${params['projectKey']}'`
+          );
+          log.error(
+            `❌ Try using jira_get_issue_types to see available issue types for this project`
+          );
+
+          // Check if it's a scope restriction error
+          if (
+            error instanceof Error &&
+            'context' in error &&
+            (error as any).context?.data?.errors?.issuetype
+          ) {
+            log.error(`❌ Issue type scope error: ${(error as any).context.data.errors.issuetype}`);
+          }
+        }
+      }
+      throw error;
+    }
+  }
+);
+
+server.tool(
+  'jira_get_issue',
+  {
+    issueKeyOrId: z.string(),
+    expand: z.string().optional(),
+  },
+  async params => {
+    log.info(`🔧 Tool 'jira_get_issue' called with params: ${JSON.stringify(params)}`);
+    try {
+      const result = await issueService.getIssue(params['issueKeyOrId'], params['expand']);
+      log.info(`✅ Retrieved issue: ${result.key}`);
+      return {
+        content: [{ type: 'text', text: JSON.stringify(result, null, 2) }],
+      };
+    } catch (error) {
+      log.error(`❌ Error in jira_get_issue: ${error}`);
+      throw error;
+    }
+  }
+);
+
+server.tool(
+  'jira_search_issues',
+  {
+    jql: z.string().optional(),
+    startAt: z.number().optional(),
+    maxResults: z.number().optional(),
+    validateQuery: z.boolean().optional(),
+    fields: z.array(z.string()).optional(),
+    expand: z.array(z.string()).optional(),
+    properties: z.array(z.string()).optional(),
+    fieldsByKeys: z.boolean().optional(),
+  },
+  async params => {
+    log.info(`🔧 Tool 'jira_search_issues' called with params: ${JSON.stringify(params)}`);
+    try {
+      const filteredParams = Object.fromEntries(
+        Object.entries(params).filter(([, value]) => value !== undefined)
+      );
+
+      const result = await issueService.searchIssues(filteredParams);
+      log.info(`✅ Retrieved ${result.issues.length} issues from search`);
+      return {
+        content: [{ type: 'text', text: JSON.stringify(result, null, 2) }],
+      };
+    } catch (error) {
+      log.error(`❌ Error in jira_search_issues: ${error}`);
       throw error;
     }
   }
@@ -755,7 +1007,7 @@ async function handleSSE(req: http.IncomingMessage, res: http.ServerResponse, ur
     await server.connect(transport);
     log.info(`✅ MCP server connected to SSE transport: ${transport.sessionId}`);
     log.info(
-      `📋 Available tools: jira_get_all_boards, jira_create_board, jira_get_board_by_id, jira_delete_board, jira_get_board_backlog, jira_get_board_epics, jira_get_board_sprints, jira_get_board_issues, jira_move_issues_to_board, jira_get_my_filters, jira_get_favourite_filters, jira_search_filters, jira_move_issues_to_backlog, jira_move_issues_to_backlog_for_board, jira_create_project, jira_get_all_projects, jira_get_project, jira_check_project_exists, jira_get_current_user, jira_update_project, jira_delete_project, jira_create_project_with_board`
+      `📋 Available tools: jira_get_all_boards, jira_create_board, jira_get_board_by_id, jira_delete_board, jira_get_board_backlog, jira_get_board_epics, jira_get_board_sprints, jira_get_board_issues, jira_move_issues_to_board, jira_get_my_filters, jira_get_favourite_filters, jira_search_filters, jira_move_issues_to_backlog, jira_move_issues_to_backlog_for_board, jira_create_project, jira_get_all_projects, jira_get_project, jira_check_project_exists, jira_get_current_user, jira_update_project, jira_delete_project, jira_create_project_with_board, jira_get_issue_types, jira_create_user_story, jira_create_bug, jira_create_issue, jira_get_issue, jira_search_issues`
     );
 
     res.on('close', () => {
@@ -881,11 +1133,3 @@ if (import.meta.url === `file://${process.argv[1] || ''}`) {
     process.exit(1);
   });
 }
-
-// set transport
-// async function init() {
-//   const transport = new StdioServerTransport();
-//   await server.connect(transport);
-// }
-
-// init();

@@ -56,6 +56,15 @@ export const jiraApiEndpoint = {
   user: {
     getCurrentUser: '/rest/api/3/myself',
   },
+  issue: {
+    createIssue: '/rest/api/3/issue',
+    getIssue: '/rest/api/3/issue/%s',
+    updateIssue: '/rest/api/3/issue/%s',
+    deleteIssue: '/rest/api/3/issue/%s',
+    searchIssues: '/rest/api/3/search',
+    getIssueTypes: '/rest/api/3/issuetype',
+    getIssueType: '/rest/api/3/issuetype/%s',
+  },
 };
 
 export const axiosClient = axios.create({

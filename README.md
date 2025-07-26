@@ -174,6 +174,15 @@ The MCP server supports two transport modes:
 - `jira_delete_project`: Delete a project
 - `jira_create_project_with_board`: Create a project with an associated board
 
+### Issue Management
+
+- `jira_get_issue_types`: Get all available issue types
+- `jira_create_user_story`: Create a user story in a project
+- `jira_create_bug`: Create a bug in a project
+- `jira_create_issue`: Create any type of issue with custom fields
+- `jira_get_issue`: Get issue details by key or ID
+- `jira_search_issues`: Search for issues using JQL
+
 ### Board Operations
 
 - `jira_get_board_backlog`: Get issues in board backlog
