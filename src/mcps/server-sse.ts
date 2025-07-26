@@ -9,6 +9,7 @@ import * as boardService from '../services/jira/board.js';
 import * as filterService from '../services/jira/filter.js';
 import * as projectService from '../services/jira/project.js';
 import * as issueService from '../services/jira/issue.js';
+import * as estimationService from '../services/jira/estimation.js';
 import { Logger } from '../utils/log.js';
 
 // Import Jira services
@@ -1434,6 +1435,119 @@ server.tool(
   }
 );
 
+// Story Estimation Tools
+
+server.tool(
+  'jira_ai_estimate_stories_in_project',
+  {
+    projectKey: z.string().describe('The project key (e.g., "FITPULSE") to estimate stories for'),
+    defaultStoryPoints: z
+      .number()
+      .optional()
+      .describe('Default story points to assign (defaults to 3)'),
+    estimationLabel: z
+      .string()
+      .optional()
+      .describe('Label to add to estimated stories (defaults to "ai-estimation")'),
+    maxResults: z
+      .number()
+      .optional()
+      .describe('Maximum number of stories to process (defaults to 100)'),
+  },
+  {
+    description:
+      'AI-powered automatic estimation of all unestimated stories in a project by assigning default story points and adding an AI estimation label. This tool will find all stories without story points, estimate them with the specified default value, and add a label to track which stories were automatically estimated by AI.',
+    examples: [
+      {
+        name: 'AI Estimate Stories with Default Points',
+        input: {
+          projectKey: 'FITPULSE',
+        },
+      },
+      {
+        name: 'AI Estimate Stories with Custom Points',
+        input: {
+          projectKey: 'FITPULSE',
+          defaultStoryPoints: 5,
+          estimationLabel: 'ai-estimated',
+        },
+      },
+    ],
+  },
+  async params => {
+    log.info(
+      `🔧 Tool 'jira_ai_estimate_stories_in_project' called with params: ${JSON.stringify(params)}`
+    );
+    try {
+      const estimationParams: estimationService.EstimateStoriesParams = {
+        projectKey: params['projectKey'],
+        ...(params['defaultStoryPoints'] !== undefined && {
+          defaultStoryPoints: params['defaultStoryPoints'],
+        }),
+        ...(params['estimationLabel'] !== undefined && {
+          estimationLabel: params['estimationLabel'],
+        }),
+        ...(params['maxResults'] !== undefined && { maxResults: params['maxResults'] }),
+      };
+
+      const result = await estimationService.estimateStoriesInProject(estimationParams);
+
+      log.info(`✅ AI story estimation completed for project ${params['projectKey']}`);
+      log.info(
+        `📊 Results: ${result.estimatedStories} AI-estimated, ${result.failedEstimations} failed`
+      );
+
+      return {
+        content: [{ type: 'text', text: JSON.stringify(result, null, 2) }],
+      };
+    } catch (error) {
+      log.error(`❌ Error in jira_ai_estimate_stories_in_project: ${error}`);
+      throw error;
+    }
+  }
+);
+
+server.tool(
+  'jira_get_project_ai_estimation_stats',
+  {
+    projectKey: z
+      .string()
+      .describe('The project key (e.g., "FITPULSE") to get estimation statistics for'),
+  },
+  {
+    description:
+      'Get AI estimation statistics for a project, including total stories, estimated vs unestimated counts, AI-estimated stories, and average story points. This is useful for understanding the current state of AI story estimation in a project.',
+    examples: [
+      {
+        name: 'Get FITPULSE Project AI Estimation Stats',
+        input: {
+          projectKey: 'FITPULSE',
+        },
+      },
+    ],
+  },
+  async params => {
+    log.info(
+      `🔧 Tool 'jira_get_project_ai_estimation_stats' called with params: ${JSON.stringify(params)}`
+    );
+    try {
+      const stats = await estimationService.getProjectEstimationStats(params['projectKey']);
+
+      log.info(`📊 Retrieved AI estimation stats for project ${params['projectKey']}`);
+      log.info(
+        `📈 Stats: ${stats.totalStories} total, ${stats.estimatedStories} estimated, ${stats.aiEstimatedStories} AI-estimated`
+      );
+
+      return {
+        content: [{ type: 'text', text: JSON.stringify(stats, null, 2) }],
+      };
+    } catch (error) {
+      log.error(`❌ Error in jira_get_project_ai_estimation_stats: ${error}`);
+      throw error;
+    }
+  }
+);
+
 // Board Resources
 
 server.registerResource(
@@ -1547,7 +1661,7 @@ async function handleSSE(req: http.IncomingMessage, res: http.ServerResponse, ur
     await server.connect(transport);
     log.info(`✅ MCP server connected to SSE transport: ${transport.sessionId}`);
     log.info(
-      `📋 Available tools: jira_get_all_boards, jira_create_board, jira_get_board_by_id, jira_delete_board, jira_get_board_backlog, jira_get_board_epics, jira_get_board_sprints, jira_get_board_issues, jira_move_issues_to_board, jira_get_my_filters, jira_get_favourite_filters, jira_search_filters, jira_move_issues_to_backlog, jira_move_issues_to_backlog_for_board, jira_create_project, jira_get_all_projects, jira_get_project, jira_check_project_exists, jira_get_current_user, jira_update_project, jira_delete_project, jira_create_project_with_board, jira_get_issue_types, jira_get_project_issue_types, jira_create_user_story, jira_create_bug, jira_create_issue, jira_get_issue, jira_search_issues, jira_delete_issue, jira_get_issue_transitions, jira_update_issue`
+      `📋 Available tools: jira_get_all_boards, jira_create_board, jira_get_board_by_id, jira_delete_board, jira_get_board_backlog, jira_get_board_epics, jira_get_board_sprints, jira_get_board_issues, jira_move_issues_to_board, jira_get_my_filters, jira_get_favourite_filters, jira_search_filters, jira_move_issues_to_backlog, jira_move_issues_to_backlog_for_board, jira_create_project, jira_get_all_projects, jira_get_project, jira_check_project_exists, jira_get_current_user, jira_update_project, jira_delete_project, jira_create_project_with_board, jira_get_issue_types, jira_get_project_issue_types, jira_create_user_story, jira_create_bug, jira_create_issue, jira_get_issue, jira_search_issues, jira_delete_issue, jira_get_issue_transitions, jira_update_issue, jira_ai_estimate_stories_in_project, jira_get_project_ai_estimation_stats`
     );
 
     res.on('close', () => {
