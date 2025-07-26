@@ -77,12 +77,12 @@ server.tool(
         name: params['name'],
         type: params['type'],
         filterId: defaultFilterId,
-        location: params['location']
-          ? {
-              type: params['location'].type,
-              projectKeyOrId: params['location'].projectKeyOrId || '',
-            }
-          : undefined,
+        ...(params['location'] && {
+          location: {
+            type: params['location'].type,
+            projectKeyOrId: params['location'].projectKeyOrId || '',
+          },
+        }),
       };
 
       log.info(`📤 Sending to boardService.createBoard: ${JSON.stringify(input)}`);
@@ -483,8 +483,8 @@ server.tool(
     log.info(`🔧 Tool 'jira_get_board_issues' called with params: ${JSON.stringify(params)}`);
     try {
       const result = await boardService.getBoardIssues(params['boardId'], {
-        startAt: params['startAt'],
-        maxResults: params['maxResults'],
+        ...(params['startAt'] !== undefined && { startAt: params['startAt'] }),
+        ...(params['maxResults'] !== undefined && { maxResults: params['maxResults'] }),
       });
       log.info(`✅ Retrieved ${result.issues.length} issues`);
       return {
@@ -513,9 +513,13 @@ server.tool(
     try {
       await boardService.moveIssuesToBoard(params['boardId'], {
         issues: params['issues'],
-        rankAfterIssue: params['rankAfterIssue'],
-        rankBeforeIssue: params['rankBeforeIssue'],
-        rankCustomFieldId: params['rankCustomFieldId'],
+        ...(params['rankAfterIssue'] !== undefined && { rankAfterIssue: params['rankAfterIssue'] }),
+        ...(params['rankBeforeIssue'] !== undefined && {
+          rankBeforeIssue: params['rankBeforeIssue'],
+        }),
+        ...(params['rankCustomFieldId'] !== undefined && {
+          rankCustomFieldId: params['rankCustomFieldId'],
+        }),
       });
       log.info(`✅ Moved ${params['issues'].length} issues to board ${params['boardId']}`);
       return {
@@ -636,9 +640,13 @@ server.tool(
     try {
       await backlogService.moveIssuesToBacklogForBoard(params['boardId'], {
         issues: params['issues'],
-        rankAfterIssue: params['rankAfterIssue'],
-        rankBeforeIssue: params['rankBeforeIssue'],
-        rankCustomFieldId: params['rankCustomFieldId'],
+        ...(params['rankAfterIssue'] !== undefined && { rankAfterIssue: params['rankAfterIssue'] }),
+        ...(params['rankBeforeIssue'] !== undefined && {
+          rankBeforeIssue: params['rankBeforeIssue'],
+        }),
+        ...(params['rankCustomFieldId'] !== undefined && {
+          rankCustomFieldId: params['rankCustomFieldId'],
+        }),
       });
       log.info(
         `✅ Moved ${params['issues'].length} issues to backlog for board ${params['boardId']}`
