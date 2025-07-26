@@ -41,5 +41,5 @@ ENV NODE_ENV=production
 HEALTHCHECK --interval=30s --timeout=3s --start-period=5s --retries=3 \
   CMD node -e "console.log('Health check passed')" || exit 1
 
-# Default command to run the MCP server
-CMD ["node", "dist/mcps/index.js"] 
+# Default command to run the MCP SSE server
+CMD ["node", "dist/mcps/server-sse.js"] 

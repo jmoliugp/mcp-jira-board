@@ -1,5 +1,5 @@
 import axios from 'axios';
-import { config } from '../../utils/config';
+import { config } from '../../utils/config.js';
 
 export const jiraApiEndpoint = {
   backlog: {
@@ -34,6 +34,28 @@ export const jiraApiEndpoint = {
     getBoardSprintIssues: '/rest/agile/1.0/board/%s/sprint/%s/issue',
     getBoardVersions: '/rest/agile/1.0/board/%s/version',
   },
+  filter: {
+    getMyFilters: '/rest/api/3/filter/my',
+    getFavouriteFilters: '/rest/api/3/filter/favourite',
+    searchFilters: '/rest/api/3/filter/search',
+    createFilter: '/rest/api/3/filter',
+    getFilter: '/rest/api/3/filter/%s',
+  },
+  project: {
+    createProject: '/rest/api/3/project',
+    getAllProjects: '/rest/api/3/project',
+    getProject: '/rest/api/3/project/%s',
+    updateProject: '/rest/api/3/project/%s',
+    deleteProject: '/rest/api/3/project/%s',
+    getProjectComponents: '/rest/api/3/project/%s/components',
+    getProjectVersions: '/rest/api/3/project/%s/versions',
+    getProjectRoles: '/rest/api/3/project/%s/role',
+    getProjectRole: '/rest/api/3/project/%s/role/%s',
+    getProjectUsers: '/rest/api/3/project/%s/role/%s',
+  },
+  user: {
+    getCurrentUser: '/rest/api/3/myself',
+  },
 };
 
 export const axiosClient = axios.create({
@@ -46,6 +68,7 @@ export const axiosClient = axios.create({
     Accept: 'application/json',
     'Content-Type': 'application/json',
   },
+  timeout: config.jira.apiTimeout,
 });
 
 axiosClient.interceptors.request.use(/* logging */);

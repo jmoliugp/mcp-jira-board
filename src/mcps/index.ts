@@ -1,12 +1,12 @@
 import { McpServer, ResourceTemplate } from '@modelcontextprotocol/sdk/server/mcp.js';
 import { StdioServerTransport } from '@modelcontextprotocol/sdk/server/stdio.js';
-import { Logger } from '../utils/log';
+import { Logger } from '../utils/log.js';
 
 import z from 'zod';
 
 // Import Jira services
-import * as boardService from '../services/jira/board';
-import * as backlogService from '../services/jira/backlog';
+import * as boardService from '../services/jira/board.js';
+import * as backlogService from '../services/jira/backlog.js';
 
 const log = new Logger('MCP Server');
 

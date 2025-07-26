@@ -1,16 +1,16 @@
 import { describe, it, expect, vi, afterEach } from 'vitest';
-import * as board from './board';
-import { axiosClient } from './networking';
+import * as board from './board.js';
+import { axiosClient } from './networking.js';
 import {
   UserInputError,
   AuthenticationError,
   ForbiddenError,
   NotFoundError,
   InternalServerError,
-} from '../../utils/error';
+} from '../../utils/error.js';
 
-vi.mock('./networking', async () => {
-  const actual = await vi.importActual<typeof import('./networking')>('./networking');
+vi.mock('./networking.js', async () => {
+  const actual = await vi.importActual<typeof import('./networking.js')>('./networking.js');
   return {
     ...actual,
     axiosClient: {

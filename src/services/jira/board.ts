@@ -1,17 +1,17 @@
 // Ref: https://developer.atlassian.com/cloud/jira/software/rest/api-group-board/#api-group-board
 
 import { format } from 'util';
-import { axiosClient, jiraApiEndpoint } from './networking';
+import { axiosClient, jiraApiEndpoint } from './networking.js';
 import {
   UserInputError,
   AuthenticationError,
   ForbiddenError,
   NotFoundError,
   InternalServerError,
-} from '../../utils/error';
+} from '../../utils/error.js';
 import { AxiosError } from 'axios';
 import { performance } from 'perf_hooks';
-import { Logger } from '../../utils/log';
+import { Logger } from '../../utils/log.js';
 
 const log = new Logger('jira/board');
 
@@ -108,6 +108,7 @@ export const createBoard = async (input: CreateBoardInput): Promise<BoardDetails
   const start = performance.now();
   try {
     const { data } = await axiosClient.post<BoardDetails>(jiraApiEndpoint.board.createBoard, input);
+
     const end = performance.now();
     log.info(`⏱️ createBoard executed in ${(end - start).toFixed(2)}ms`);
     return data;
