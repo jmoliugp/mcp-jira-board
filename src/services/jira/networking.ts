@@ -1,5 +1,5 @@
 import axios from 'axios';
-import { config } from '../../utils/config';
+import { config } from '../../utils/config.js';
 
 export const jiraApiEndpoint = {
   backlog: {
@@ -33,6 +33,13 @@ export const jiraApiEndpoint = {
     getBoardSprints: '/rest/agile/1.0/board/%s/sprint',
     getBoardSprintIssues: '/rest/agile/1.0/board/%s/sprint/%s/issue',
     getBoardVersions: '/rest/agile/1.0/board/%s/version',
+  },
+  filter: {
+    getMyFilters: '/rest/api/3/filter/my',
+    getFavouriteFilters: '/rest/api/3/filter/favourite',
+    getFilter: '/rest/api/3/filter/%s',
+    searchFilters: '/rest/api/3/filter/search',
+    createFilter: '/rest/api/3/filter',
   },
 };
 

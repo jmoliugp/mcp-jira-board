@@ -1,15 +1,15 @@
-import http from 'node:http';
-import crypto from 'node:crypto';
 import { McpServer, ResourceTemplate } from '@modelcontextprotocol/sdk/server/mcp.js';
 import { SSEServerTransport } from '@modelcontextprotocol/sdk/server/sse.js';
 import { StreamableHTTPServerTransport } from '@modelcontextprotocol/sdk/server/streamableHttp.js';
-import { Logger } from '../utils/log';
-
+import crypto from 'node:crypto';
+import http from 'node:http';
 import z from 'zod';
+import { Logger } from '../utils/log.js';
+import * as backlogService from '../services/jira/backlog.js';
+import * as boardService from '../services/jira/board.js';
+import * as filterService from '../services/jira/filter.js';
 
 // Import Jira services
-import * as boardService from '../services/jira/board';
-import * as backlogService from '../services/jira/backlog';
 
 const log = new Logger('MCP SSE Server');
 
@@ -23,25 +23,23 @@ log.info('🔧 Initializing Jira MCP server with tools and resources...');
 
 // Board Management Tools
 
-server.registerTool(
+server.tool(
   'jira_get_all_boards',
   {
-    title: 'Get All Boards',
-    description: 'Retrieve all boards visible to the user with optional filtering',
-    // @ts-ignore
-    inputSchema: z.object({
-      startAt: z.number().optional(),
-      maxResults: z.number().optional(),
-      type: z.enum(['scrum', 'kanban']).optional(),
-      name: z.string().optional(),
-      projectKeyOrId: z.string().optional(),
-    }),
+    startAt: z.number().optional(),
+    maxResults: z.number().optional(),
+    type: z.enum(['scrum', 'kanban']).optional(),
+    name: z.string().optional(),
+    projectKeyOrId: z.string().optional(),
   },
   async params => {
     log.info(`🔧 Tool 'jira_get_all_boards' called with params: ${JSON.stringify(params)}`);
+    log.info(`🔍 Params type: ${typeof params}, keys: ${params ? Object.keys(params) : 'null'}`);
     try {
       const result = await boardService.getAllBoards(params || {});
+
       log.info(`✅ Retrieved ${result.values.length} boards`);
+      log.info(`📤 Returning result to Cursor...`);
       return {
         content: [{ type: 'text', text: JSON.stringify(result, null, 2) }],
       };
@@ -52,48 +50,54 @@ server.registerTool(
   }
 );
 
-server.registerTool(
+server.tool(
   'jira_create_board',
   {
-    title: 'Create Board',
-    description: 'Create a new scrum or kanban board',
-    // @ts-ignore
-    inputSchema: z.object({
-      name: z.string(),
-      type: z.enum(['scrum', 'kanban']),
-      filterId: z.number(),
-      location: z
-        .object({
-          type: z.enum(['project', 'user']),
-          projectKeyOrId: z.string().optional(),
-        })
-        .optional(),
-    }),
+    name: z.string(),
+    type: z.enum(['scrum', 'kanban']),
+    location: z
+      .object({
+        type: z.enum(['project', 'user']),
+        projectKeyOrId: z.string().optional(),
+      })
+      .optional(),
   },
   async params => {
     log.info(`🔧 Tool 'jira_create_board' called with params: ${JSON.stringify(params)}`);
     try {
-      const result = await boardService.createBoard(params as boardService.CreateBoardInput);
+      // Get or create a default filter with maximum privileges
+      const defaultFilterId = await filterService.getOrCreateDefaultFilter();
+
+      const input: boardService.CreateBoardInput = {
+        name: params['name'],
+        type: params['type'],
+        filterId: defaultFilterId,
+        location: params['location'],
+      };
+
+      log.info(`📤 Sending to boardService.createBoard: ${JSON.stringify(input)}`);
+
+      const result = await boardService.createBoard(input);
       log.info(`✅ Created board: ${result.name} (ID: ${result.id})`);
       return {
         content: [{ type: 'text', text: JSON.stringify(result, null, 2) }],
       };
     } catch (error) {
       log.error(`❌ Error in jira_create_board: ${error}`);
+      // Log more details about the error
+      if (error instanceof Error) {
+        log.error(`❌ Error message: ${error.message}`);
+        log.error(`❌ Error stack: ${error.stack}`);
+      }
       throw error;
     }
   }
 );
 
-server.registerTool(
+server.tool(
   'jira_get_board_by_id',
   {
-    title: 'Get Board by ID',
-    description: 'Retrieve board details by board ID',
-    // @ts-ignore
-    inputSchema: z.object({
-      boardId: z.number(),
-    }),
+    boardId: z.number(),
   },
   async params => {
     log.info(`🔧 Tool 'jira_get_board_by_id' called with params: ${JSON.stringify(params)}`);
@@ -114,23 +118,18 @@ server.registerTool(
   }
 );
 
-server.registerTool(
+server.tool(
   'jira_delete_board',
   {
-    title: 'Delete Board',
-    description: 'Delete a board by ID',
-    // @ts-ignore
-    inputSchema: z.object({
-      boardId: z.number(),
-    }),
+    boardId: z.number(),
   },
-  async ({ boardId }) => {
-    log.info(`🔧 Tool 'jira_delete_board' called with boardId: ${boardId}`);
+  async params => {
+    log.info(`🔧 Tool 'jira_delete_board' called with params: ${JSON.stringify(params)}`);
     try {
-      await boardService.deleteBoard(boardId);
-      log.info(`✅ Deleted board with ID: ${boardId}`);
+      await boardService.deleteBoard(params['boardId']);
+      log.info(`✅ Deleted board with ID: ${params['boardId']}`);
       return {
-        content: [{ type: 'text', text: `Board ${boardId} deleted successfully` }],
+        content: [{ type: 'text', text: `Board ${params['boardId']} deleted successfully` }],
       };
     } catch (error) {
       log.error(`❌ Error in jira_delete_board: ${error}`);
@@ -139,22 +138,20 @@ server.registerTool(
   }
 );
 
-server.registerTool(
+server.tool(
   'jira_get_board_backlog',
   {
-    title: 'Get Board Backlog',
-    description: 'Get issues in the backlog of a board',
-    // @ts-ignore
-    inputSchema: z.object({
-      boardId: z.number(),
-      startAt: z.number().optional(),
-      maxResults: z.number().optional(),
-    }),
+    boardId: z.number(),
+    startAt: z.number().optional(),
+    maxResults: z.number().optional(),
   },
-  async ({ boardId, startAt, maxResults }) => {
-    log.info(`🔧 Tool 'jira_get_board_backlog' called with boardId: ${boardId}`);
+  async params => {
+    log.info(`🔧 Tool 'jira_get_board_backlog' called with params: ${JSON.stringify(params)}`);
     try {
-      const result = await boardService.getBoardBacklog(boardId, { startAt, maxResults });
+      const result = await boardService.getBoardBacklog(params['boardId'], {
+        startAt: params['startAt'],
+        maxResults: params['maxResults'],
+      });
       log.info(`✅ Retrieved ${result.issues.length} backlog issues`);
       return {
         content: [{ type: 'text', text: JSON.stringify(result, null, 2) }],
@@ -166,22 +163,20 @@ server.registerTool(
   }
 );
 
-server.registerTool(
+server.tool(
   'jira_get_board_epics',
   {
-    title: 'Get Board Epics',
-    description: 'Get epics for a board',
-    // @ts-ignore
-    inputSchema: z.object({
-      boardId: z.number(),
-      startAt: z.number().optional(),
-      maxResults: z.number().optional(),
-    }),
+    boardId: z.number(),
+    startAt: z.number().optional(),
+    maxResults: z.number().optional(),
   },
-  async ({ boardId, startAt, maxResults }) => {
-    log.info(`🔧 Tool 'jira_get_board_epics' called with boardId: ${boardId}`);
+  async params => {
+    log.info(`🔧 Tool 'jira_get_board_epics' called with params: ${JSON.stringify(params)}`);
     try {
-      const result = await boardService.getBoardEpics(boardId, { startAt, maxResults });
+      const result = await boardService.getBoardEpics(params['boardId'], {
+        startAt: params['startAt'],
+        maxResults: params['maxResults'],
+      });
       log.info(`✅ Retrieved ${result.values.length} epics`);
       return {
         content: [{ type: 'text', text: JSON.stringify(result, null, 2) }],
@@ -193,23 +188,22 @@ server.registerTool(
   }
 );
 
-server.registerTool(
+server.tool(
   'jira_get_board_sprints',
   {
-    title: 'Get Board Sprints',
-    description: 'Get sprints for a board',
-    // @ts-ignore
-    inputSchema: z.object({
-      boardId: z.number(),
-      startAt: z.number().optional(),
-      maxResults: z.number().optional(),
-      state: z.string().optional(),
-    }),
+    boardId: z.number(),
+    startAt: z.number().optional(),
+    maxResults: z.number().optional(),
+    state: z.string().optional(),
   },
-  async ({ boardId, startAt, maxResults, state }) => {
-    log.info(`🔧 Tool 'jira_get_board_sprints' called with boardId: ${boardId}`);
+  async params => {
+    log.info(`🔧 Tool 'jira_get_board_sprints' called with params: ${JSON.stringify(params)}`);
     try {
-      const result = await boardService.getBoardSprints(boardId, { startAt, maxResults, state });
+      const result = await boardService.getBoardSprints(params['boardId'], {
+        startAt: params['startAt'],
+        maxResults: params['maxResults'],
+        state: params['state'],
+      });
       log.info(`✅ Retrieved ${result.values.length} sprints`);
       return {
         content: [{ type: 'text', text: JSON.stringify(result, null, 2) }],
@@ -221,22 +215,20 @@ server.registerTool(
   }
 );
 
-server.registerTool(
+server.tool(
   'jira_get_board_issues',
   {
-    title: 'Get Board Issues',
-    description: 'Get issues for a board',
-    // @ts-ignore
-    inputSchema: z.object({
-      boardId: z.number(),
-      startAt: z.number().optional(),
-      maxResults: z.number().optional(),
-    }),
+    boardId: z.number(),
+    startAt: z.number().optional(),
+    maxResults: z.number().optional(),
   },
-  async ({ boardId, startAt, maxResults }) => {
-    log.info(`🔧 Tool 'jira_get_board_issues' called with boardId: ${boardId}`);
+  async params => {
+    log.info(`🔧 Tool 'jira_get_board_issues' called with params: ${JSON.stringify(params)}`);
     try {
-      const result = await boardService.getBoardIssues(boardId, { startAt, maxResults });
+      const result = await boardService.getBoardIssues(params['boardId'], {
+        startAt: params['startAt'],
+        maxResults: params['maxResults'],
+      });
       log.info(`✅ Retrieved ${result.issues.length} issues`);
       return {
         content: [{ type: 'text', text: JSON.stringify(result, null, 2) }],
@@ -248,35 +240,33 @@ server.registerTool(
   }
 );
 
-server.registerTool(
+server.tool(
   'jira_move_issues_to_board',
   {
-    title: 'Move Issues to Board',
-    description: 'Move issues to a board with optional ranking',
-    // @ts-ignore
-    inputSchema: z.object({
-      boardId: z.number(),
-      issues: z.array(z.string()),
-      rankAfterIssue: z.string().optional(),
-      rankBeforeIssue: z.string().optional(),
-      rankCustomFieldId: z.number().optional(),
-    }),
+    boardId: z.number(),
+    issues: z.array(z.string()),
+    rankAfterIssue: z.string().optional(),
+    rankBeforeIssue: z.string().optional(),
+    rankCustomFieldId: z.number().optional(),
   },
-  async ({ boardId, issues, rankAfterIssue, rankBeforeIssue, rankCustomFieldId }) => {
+  async params => {
     log.info(
-      `🔧 Tool 'jira_move_issues_to_board' called with boardId: ${boardId}, issues: ${issues.length}`
+      `🔧 Tool 'jira_move_issues_to_board' called with boardId: ${params['boardId']}, issues: ${params['issues'].length}`
     );
     try {
-      await boardService.moveIssuesToBoard(boardId, {
-        issues,
-        rankAfterIssue,
-        rankBeforeIssue,
-        rankCustomFieldId,
+      await boardService.moveIssuesToBoard(params['boardId'], {
+        issues: params['issues'],
+        rankAfterIssue: params['rankAfterIssue'],
+        rankBeforeIssue: params['rankBeforeIssue'],
+        rankCustomFieldId: params['rankCustomFieldId'],
       });
-      log.info(`✅ Moved ${issues.length} issues to board ${boardId}`);
+      log.info(`✅ Moved ${params['issues'].length} issues to board ${params['boardId']}`);
       return {
         content: [
-          { type: 'text', text: `Successfully moved ${issues.length} issues to board ${boardId}` },
+          {
+            type: 'text',
+            text: `Successfully moved ${params['issues'].length} issues to board ${params['boardId']}`,
+          },
         ],
       };
     } catch (error) {
@@ -286,25 +276,81 @@ server.registerTool(
   }
 );
 
+// Filter Management Tools
+
+server.tool('jira_get_my_filters', {}, async () => {
+  log.info(`🔧 Tool 'jira_get_my_filters' called`);
+  try {
+    const result = await filterService.getMyFilters();
+    log.info(`✅ Retrieved ${result.values.length} filters`);
+    return {
+      content: [{ type: 'text', text: JSON.stringify(result, null, 2) }],
+    };
+  } catch (error) {
+    log.error(`❌ Error in jira_get_my_filters: ${error}`);
+    throw error;
+  }
+});
+
+server.tool('jira_get_favourite_filters', {}, async () => {
+  log.info(`🔧 Tool 'jira_get_favourite_filters' called`);
+  try {
+    const result = await filterService.getFavouriteFilters();
+    log.info(`✅ Retrieved ${result.values.length} favourite filters`);
+    return {
+      content: [{ type: 'text', text: JSON.stringify(result, null, 2) }],
+    };
+  } catch (error) {
+    log.error(`❌ Error in jira_get_favourite_filters: ${error}`);
+    throw error;
+  }
+});
+
+server.tool(
+  'jira_search_filters',
+  {
+    filterName: z.string().optional(),
+    accountId: z.string().optional(),
+    owner: z.string().optional(),
+    groupname: z.string().optional(),
+    projectId: z.number().optional(),
+    id: z.number().optional(),
+    orderBy: z.string().optional(),
+    startAt: z.number().optional(),
+    maxResults: z.number().optional(),
+    expand: z.string().optional(),
+  },
+  async params => {
+    log.info(`🔧 Tool 'jira_search_filters' called with params: ${JSON.stringify(params)}`);
+    try {
+      const result = await filterService.searchFilters(params);
+      log.info(`✅ Retrieved ${result.values.length} filters from search`);
+      return {
+        content: [{ type: 'text', text: JSON.stringify(result, null, 2) }],
+      };
+    } catch (error) {
+      log.error(`❌ Error in jira_search_filters: ${error}`);
+      throw error;
+    }
+  }
+);
+
 // Backlog Management Tools
 
-server.registerTool(
+server.tool(
   'jira_move_issues_to_backlog',
   {
-    title: 'Move Issues to Backlog',
-    description: 'Move issues to the backlog (remove from sprints)',
-    // @ts-ignore
-    inputSchema: z.object({
-      issues: z.array(z.string()),
-    }),
+    issues: z.array(z.string()),
   },
-  async ({ issues }) => {
-    log.info(`🔧 Tool 'jira_move_issues_to_backlog' called with ${issues.length} issues`);
+  async params => {
+    log.info(`🔧 Tool 'jira_move_issues_to_backlog' called with ${params['issues'].length} issues`);
     try {
-      await backlogService.moveIssuesToBacklog({ issues });
-      log.info(`✅ Moved ${issues.length} issues to backlog`);
+      await backlogService.moveIssuesToBacklog({ issues: params['issues'] });
+      log.info(`✅ Moved ${params['issues'].length} issues to backlog`);
       return {
-        content: [{ type: 'text', text: `Successfully moved ${issues.length} issues to backlog` }],
+        content: [
+          { type: 'text', text: `Successfully moved ${params['issues'].length} issues to backlog` },
+        ],
       };
     } catch (error) {
       log.error(`❌ Error in jira_move_issues_to_backlog: ${error}`);
@@ -313,37 +359,34 @@ server.registerTool(
   }
 );
 
-server.registerTool(
+server.tool(
   'jira_move_issues_to_backlog_for_board',
   {
-    title: 'Move Issues to Backlog for Board',
-    description: 'Move issues to the backlog of a specific board',
-    // @ts-ignore
-    inputSchema: z.object({
-      boardId: z.number(),
-      issues: z.array(z.string()),
-      rankAfterIssue: z.string().optional(),
-      rankBeforeIssue: z.string().optional(),
-      rankCustomFieldId: z.number().optional(),
-    }),
+    boardId: z.number(),
+    issues: z.array(z.string()),
+    rankAfterIssue: z.string().optional(),
+    rankBeforeIssue: z.string().optional(),
+    rankCustomFieldId: z.number().optional(),
   },
-  async ({ boardId, issues, rankAfterIssue, rankBeforeIssue, rankCustomFieldId }) => {
+  async params => {
     log.info(
-      `🔧 Tool 'jira_move_issues_to_backlog_for_board' called with boardId: ${boardId}, issues: ${issues.length}`
+      `🔧 Tool 'jira_move_issues_to_backlog_for_board' called with boardId: ${params['boardId']}, issues: ${params['issues'].length}`
     );
     try {
-      await backlogService.moveIssuesToBacklogForBoard(boardId, {
-        issues,
-        rankAfterIssue,
-        rankBeforeIssue,
-        rankCustomFieldId,
+      await backlogService.moveIssuesToBacklogForBoard(params['boardId'], {
+        issues: params['issues'],
+        rankAfterIssue: params['rankAfterIssue'],
+        rankBeforeIssue: params['rankBeforeIssue'],
+        rankCustomFieldId: params['rankCustomFieldId'],
       });
-      log.info(`✅ Moved ${issues.length} issues to backlog for board ${boardId}`);
+      log.info(
+        `✅ Moved ${params['issues'].length} issues to backlog for board ${params['boardId']}`
+      );
       return {
         content: [
           {
             type: 'text',
-            text: `Successfully moved ${issues.length} issues to backlog for board ${boardId}`,
+            text: `Successfully moved ${params['issues'].length} issues to backlog for board ${params['boardId']}`,
           },
         ],
       };
@@ -454,22 +497,8 @@ async function handleSSE(req: http.IncomingMessage, res: http.ServerResponse, ur
 
     log.info(`✅ Processing POST message for session: ${sessionId}`);
 
-    // Log the request body for debugging
-    let body = '';
-    req.on('data', chunk => {
-      body += chunk.toString();
-    });
-    req.on('end', () => {
-      if (body) {
-        try {
-          const parsed = JSON.parse(body);
-          log.info(`📨 Message content: ${JSON.stringify(parsed, null, 2)}`);
-        } catch (e) {
-          log.info(`📨 Raw message body: ${body.substring(0, 200)}...`);
-        }
-      }
-    });
-
+    // IMPORTANTE: NO leer el body aquí - dejar que el SDK MCP lo maneje
+    // El SDK necesita el stream intacto para procesar correctamente los parámetros
     return await transport.handlePostMessage(req, res);
   } else if (req.method === 'GET') {
     const transport = new SSEServerTransport('/sse', res);
@@ -481,7 +510,7 @@ async function handleSSE(req: http.IncomingMessage, res: http.ServerResponse, ur
     await server.connect(transport);
     log.info(`✅ MCP server connected to SSE transport: ${transport.sessionId}`);
     log.info(
-      `📋 Available tools: jira_get_all_boards, jira_create_board, jira_get_board_by_id, jira_delete_board, jira_get_board_backlog, jira_get_board_epics, jira_get_board_sprints, jira_get_board_issues, jira_move_issues_to_board, jira_move_issues_to_backlog, jira_move_issues_to_backlog_for_board`
+      `📋 Available tools: jira_get_all_boards, jira_create_board, jira_get_board_by_id, jira_delete_board, jira_get_board_backlog, jira_get_board_epics, jira_get_board_sprints, jira_get_board_issues, jira_move_issues_to_board, jira_get_my_filters, jira_get_favourite_filters, jira_search_filters, jira_move_issues_to_backlog, jira_move_issues_to_backlog_for_board`
     );
 
     res.on('close', () => {
@@ -607,3 +636,11 @@ if (import.meta.url === `file://${process.argv[1] || ''}`) {
     process.exit(1);
   });
 }
+
+// set transport
+// async function init() {
+//   const transport = new StdioServerTransport();
+//   await server.connect(transport);
+// }
+
+// init();

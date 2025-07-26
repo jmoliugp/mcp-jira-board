@@ -1,0 +1,7 @@
+{
+  "mcpServers": {
+    "jira-mcp-server": {
+      "url": "http://localhost:3001/sse"
+    }
+  }
+}
