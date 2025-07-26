@@ -1387,6 +1387,12 @@ server.tool(
         };
       }
 
+      // Jira requires at least one of 'fields' or 'update' when making transitions
+      // If only transition is provided, add an empty update object
+      if (updateInput.transition && !updateInput.fields && !updateInput.update) {
+        updateInput.update = {};
+      }
+
       log.info(`📤 Updating issue with: ${JSON.stringify(updateInput, null, 2)}`);
       const result = await issueService.updateIssue(params['issueKeyOrId'], updateInput);
       log.info(`✅ Updated issue: ${result.key}`);

@@ -789,14 +789,26 @@ export const updateIssue = async (
       processedInput.update = {};
     }
 
-    const { data } = await axiosClient.put<UpdateIssueResponse>(
+    const response = await axiosClient.put<UpdateIssueResponse>(
       format(jiraApiEndpoint.issue.updateIssue, issueKeyOrId),
       processedInput
     );
 
     const end = performance.now();
     log.info(`⏱️ updateIssue executed in ${(end - start).toFixed(2)}ms`);
-    return data;
+
+    // Jira returns 204 No Content for successful transitions
+    // In this case, we need to construct the response manually
+    if (response.status === 204) {
+      log.info(`✅ Update successful (204 No Content) - constructing response manually`);
+      return {
+        id: '', // We don't have the ID from the response
+        key: issueKeyOrId, // Use the original issue key
+        self: format(jiraApiEndpoint.issue.getIssue, issueKeyOrId), // Construct the self URL
+      };
+    }
+
+    return response.data;
   } catch (error) {
     const err = error as AxiosError;
     const status = err.response?.status;
