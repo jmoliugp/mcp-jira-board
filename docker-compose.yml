@@ -23,7 +23,7 @@ services:
       - JIRA_ENVIRONMENT=${JIRA_ENVIRONMENT:-cloud}
       - OPENAI_API_KEY=${OPENAI_API_KEY}
     volumes:
-      # Mount the dist directory for development (optional)
+      # Mount the dist directory for development
       - ./dist:/app/dist:ro
     ports:
       # Expose port for health checks (optional)

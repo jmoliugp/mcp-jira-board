@@ -6,10 +6,10 @@ This directory contains integration tests for the Jira MCP Server. These tests r
 
 Integration tests are different from unit tests in that they:
 
-- **Test against real APIs**: They make actual HTTP requests to Jira
-- **Require valid credentials**: Need proper Jira configuration
-- **Test complete workflows**: Verify end-to-end functionality
-- **Handle real data**: Work with actual boards, issues, and projects
+- **Test against real APIs**: They make actual HTTP requests to Jira.
+- **Require valid credentials**: Need proper Jira configuration.
+- **Test complete workflows**: Verify end-to-end functionality.
+- **Handle real data**: Work with actual boards, issues, and projects.
 
 ## Prerequisites
 
