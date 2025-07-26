@@ -1,14 +1,14 @@
 // Ref: https://developer.atlassian.com/cloud/jira/software/rest/api-group-backlog/#api-group-backlog
 
 import { format } from 'util';
-import { axiosClient, jiraApiEndpoint } from './networking';
+import { axiosClient, jiraApiEndpoint } from './networking.js';
 import {
   UserInputError,
   AuthenticationError,
   ForbiddenError,
   NotFoundError,
   InternalServerError,
-} from '../../utils/error';
+} from '../../utils/error.js';
 import { AxiosError } from 'axios';
 
 export interface MoveToBacklogInput {

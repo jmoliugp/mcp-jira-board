@@ -152,7 +152,11 @@ server.tool(
   async params => {
     log.info(`🔧 Tool 'jira_get_all_projects' called with params: ${JSON.stringify(params)}`);
     try {
-      const result = await projectService.getAllProjects(params);
+      const filteredParams = Object.fromEntries(
+        Object.entries(params).filter(([, value]) => value !== undefined)
+      );
+
+      const result = await projectService.getAllProjects(filteredParams);
       log.info(`✅ Retrieved ${result.values.length} projects`);
       return {
         content: [{ type: 'text', text: JSON.stringify(result, null, 2) }],

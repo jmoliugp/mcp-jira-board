@@ -39,6 +39,7 @@ export const jiraApiEndpoint = {
     getFavouriteFilters: '/rest/api/3/filter/favourite',
     searchFilters: '/rest/api/3/filter/search',
     createFilter: '/rest/api/3/filter',
+    getFilter: '/rest/api/3/filter/%s',
   },
   project: {
     createProject: '/rest/api/3/project',
