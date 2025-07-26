@@ -811,6 +811,57 @@ server.tool('jira_get_issue_types', {}, async () => {
 });
 
 server.tool(
+  'jira_get_project_issue_types',
+  {
+    projectKey: z.string(),
+  },
+  {
+    description:
+      'Get available issue types for a specific project. This is more useful than jira_get_issue_types as it shows only the issue types that can be used in the specified project.',
+    examples: [
+      {
+        name: 'Get FITPULSE Project Issue Types',
+        input: {
+          projectKey: 'FITPULSE',
+        },
+      },
+    ],
+  },
+  async params => {
+    log.info(
+      `🔧 Tool 'jira_get_project_issue_types' called with params: ${JSON.stringify(params)}`
+    );
+    try {
+      const result = await projectService.getProject(params['projectKey']);
+      const issueTypes = result.issueTypes || [];
+
+      log.info(
+        `✅ Retrieved ${issueTypes.length} issue types for project '${params['projectKey']}'`
+      );
+
+      // Format the response to be more user-friendly
+      const formattedResult = {
+        projectKey: params['projectKey'],
+        projectName: result.name,
+        issueTypes: issueTypes.map(it => ({
+          id: it.id,
+          name: it.name,
+          description: it.description,
+          subtask: it.subtask,
+        })),
+      };
+
+      return {
+        content: [{ type: 'text', text: JSON.stringify(formattedResult, null, 2) }],
+      };
+    } catch (error) {
+      log.error(`❌ Error in jira_get_project_issue_types: ${error}`);
+      throw error;
+    }
+  }
+);
+
+server.tool(
   'jira_create_user_story',
   {
     projectKey: z.string(),
@@ -819,6 +870,21 @@ server.tool(
     assigneeAccountId: z.string().optional(),
     storyPoints: z.number().optional(),
     labels: z.array(z.string()).optional(),
+  },
+  {
+    description:
+      'Create a user story in a Jira project. The function will automatically find the best available issue type (Story, Task, etc.) for the project. Note: Labels may not be supported by all projects.',
+    examples: [
+      {
+        name: 'Create User Story for FITPULSE',
+        input: {
+          projectKey: 'FITPULSE',
+          summary: 'Setup project structure and development environment',
+          description: 'As a developer, I need to set up the initial project structure...',
+          labels: ['landing-page', 'frontend'],
+        },
+      },
+    ],
   },
   async params => {
     log.info(`🔧 Tool 'jira_create_user_story' called with params: ${JSON.stringify(params)}`);
@@ -832,8 +898,18 @@ server.tool(
         params['labels']
       );
       log.info(`✅ Created user story: ${result.key}`);
+
+      // Add helpful information about the created issue
+      const response = {
+        ...result,
+        note:
+          params['labels'] && params['labels'].length > 0
+            ? `Note: Labels were provided but may not be displayed if the project doesn't support them.`
+            : undefined,
+      };
+
       return {
-        content: [{ type: 'text', text: JSON.stringify(result, null, 2) }],
+        content: [{ type: 'text', text: JSON.stringify(response, null, 2) }],
       };
     } catch (error) {
       log.error(`❌ Error in jira_create_user_story: ${error}`);
@@ -887,6 +963,22 @@ server.tool(
     labels: z.array(z.string()).optional(),
     components: z.array(z.string()).optional(),
     fixVersions: z.array(z.string()).optional(),
+  },
+  {
+    description:
+      'Create a new issue in a Jira project. Make sure to use a valid issue type ID for the specific project.',
+    examples: [
+      {
+        name: 'Create a Task',
+        input: {
+          projectKey: 'FITPULSE',
+          summary: 'Implement user authentication',
+          issueTypeId: '10035',
+          description: 'Add user login and registration functionality',
+          labels: ['frontend', 'authentication'],
+        },
+      },
+    ],
   },
   async params => {
     log.info(`🔧 Tool 'jira_create_issue' called with params: ${JSON.stringify(params)}`);
@@ -949,28 +1041,54 @@ server.tool(
       };
     } catch (error) {
       log.error(`❌ Error in jira_create_issue: ${error}`);
-      // Add more detailed error information
+
+      // Enhanced error handling with project-specific issue type validation
       if (error instanceof Error) {
         log.error(`❌ Error message: ${error.message}`);
-        log.error(`❌ Error stack: ${error.stack}`);
 
-        // If it's a UserInputError, provide more context
         if (error.message.includes('Invalid input for createIssue')) {
           log.error(
-            `❌ This usually means the issue type ID '${params['issueTypeId']}' is not valid for project '${params['projectKey']}'`
-          );
-          log.error(
-            `❌ Try using jira_get_issue_types to see available issue types for this project`
+            `❌ Issue type ID '${params['issueTypeId']}' is not valid for project '${params['projectKey']}'`
           );
 
-          // Check if it's a scope restriction error
-          if (
-            error instanceof Error &&
-            'context' in error &&
-            (error as any).context?.data?.errors?.issuetype
-          ) {
-            log.error(`❌ Issue type scope error: ${(error as any).context.data.errors.issuetype}`);
+          // Try to get project-specific issue types to provide better guidance
+          try {
+            const projectResponse = await projectService.getProject(params['projectKey']);
+            const availableIssueTypes = projectResponse.issueTypes || [];
+
+            if (availableIssueTypes.length > 0) {
+              log.error(`❌ Available issue types for project '${params['projectKey']}':`);
+              availableIssueTypes.forEach(issueType => {
+                log.error(
+                  `   - ID: ${issueType.id}, Name: ${issueType.name}${issueType.subtask ? ' (Subtask)' : ''}`
+                );
+              });
+
+              // Suggest the most appropriate issue type
+              const mainIssueTypes = availableIssueTypes.filter(it => !it.subtask);
+              if (mainIssueTypes.length > 0) {
+                const suggestedType = mainIssueTypes[0];
+                if (suggestedType) {
+                  log.error(
+                    `💡 Suggestion: Use issue type ID '${suggestedType.id}' (${suggestedType.name}) instead`
+                  );
+                }
+              }
+            }
+          } catch (projectError) {
+            log.error(`❌ Could not retrieve project issue types: ${projectError}`);
           }
+
+          log.error(`❌ Use jira_get_project to see available issue types for this project`);
+        }
+
+        // Check if it's a scope restriction error
+        if (
+          error instanceof Error &&
+          'context' in error &&
+          (error as any).context?.data?.errors?.issuetype
+        ) {
+          log.error(`❌ Issue type scope error: ${(error as any).context.data.errors.issuetype}`);
         }
       }
       throw error;
@@ -1172,7 +1290,7 @@ async function handleSSE(req: http.IncomingMessage, res: http.ServerResponse, ur
     await server.connect(transport);
     log.info(`✅ MCP server connected to SSE transport: ${transport.sessionId}`);
     log.info(
-      `📋 Available tools: jira_get_all_boards, jira_create_board, jira_get_board_by_id, jira_delete_board, jira_get_board_backlog, jira_get_board_epics, jira_get_board_sprints, jira_get_board_issues, jira_move_issues_to_board, jira_get_my_filters, jira_get_favourite_filters, jira_search_filters, jira_move_issues_to_backlog, jira_move_issues_to_backlog_for_board, jira_create_project, jira_get_all_projects, jira_get_project, jira_check_project_exists, jira_get_current_user, jira_update_project, jira_delete_project, jira_create_project_with_board, jira_get_issue_types, jira_create_user_story, jira_create_bug, jira_create_issue, jira_get_issue, jira_search_issues, jira_delete_issue`
+      `📋 Available tools: jira_get_all_boards, jira_create_board, jira_get_board_by_id, jira_delete_board, jira_get_board_backlog, jira_get_board_epics, jira_get_board_sprints, jira_get_board_issues, jira_move_issues_to_board, jira_get_my_filters, jira_get_favourite_filters, jira_search_filters, jira_move_issues_to_backlog, jira_move_issues_to_backlog_for_board, jira_create_project, jira_get_all_projects, jira_get_project, jira_check_project_exists, jira_get_current_user, jira_update_project, jira_delete_project, jira_create_project_with_board, jira_get_issue_types, jira_get_project_issue_types, jira_create_user_story, jira_create_bug, jira_create_issue, jira_get_issue, jira_search_issues, jira_delete_issue`
     );
 
     res.on('close', () => {
