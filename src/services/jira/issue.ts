@@ -12,6 +12,7 @@ import {
 import { AxiosError } from 'axios';
 import { performance } from 'perf_hooks';
 import { Logger } from '../../utils/log.js';
+import * as projectService from './project.js';
 
 const log = new Logger('jira/issue');
 
@@ -257,7 +258,10 @@ export const createIssue = async (input: CreateIssueInput): Promise<CreateIssueR
     const data = err.response?.data;
     const context = { status, data, input, endpoint: jiraApiEndpoint.issue.createIssue };
 
-    if (status === 400) throw new UserInputError('Invalid input for createIssue.', context);
+    if (status === 400) {
+      log.error(`❌ Jira API validation error: ${JSON.stringify(data, null, 2)}`);
+      throw new UserInputError('Invalid input for createIssue.', context);
+    }
     if (status === 401)
       throw new AuthenticationError('Authentication failed for createIssue.', context);
     if (status === 403) throw new ForbiddenError('Access forbidden for createIssue.', context);
@@ -397,13 +401,71 @@ export const createUserStory = async (
 ): Promise<CreateIssueResponse> => {
   const start = performance.now();
   try {
-    // First, get issue types to find the Story type ID
-    const issueTypes = await getIssueTypes();
-    const storyType = issueTypes.values.find(type => type.name.toLowerCase() === 'story');
+    // First, try to get project-specific issue types to find the best match
+    let issueTypeId: string | undefined;
 
-    if (!storyType) {
-      throw new UserInputError('Story issue type not found in Jira instance.', {
-        availableTypes: issueTypes.values.map(t => t.name),
+    try {
+      // Try to get project-specific issue types first
+      const projectResponse = await projectService.getProject(projectKey);
+      const projectIssueTypes = projectResponse.issueTypes || [];
+
+      // Look for Story type in project-specific issue types
+      const storyType = projectIssueTypes.find(
+        (type: any) =>
+          type.name.toLowerCase() === 'story' || type.name.toLowerCase() === 'user story'
+      );
+
+      if (storyType) {
+        issueTypeId = storyType.id;
+        log.info(`✅ Found Story issue type (ID: ${issueTypeId}) for project ${projectKey}`);
+      } else {
+        // If no Story type found, use the first non-subtask issue type
+        const mainIssueTypes = projectIssueTypes.filter((type: any) => !type.subtask);
+        if (mainIssueTypes.length > 0) {
+          const firstType = mainIssueTypes[0];
+          if (firstType) {
+            issueTypeId = firstType.id;
+            log.info(
+              `⚠️ Story issue type not available for project ${projectKey}, using ${firstType.name} (ID: ${issueTypeId}) instead`
+            );
+          }
+        } else {
+          throw new UserInputError(`No suitable issue types found for project ${projectKey}.`, {
+            projectKey,
+            availableTypes: projectIssueTypes.map((t: any) => ({
+              id: t.id,
+              name: t.name,
+              subtask: t.subtask,
+            })),
+          });
+        }
+      }
+    } catch (projectError) {
+      // Fallback to global issue types if project-specific lookup fails
+      log.warn(
+        `⚠️ Could not get project-specific issue types for ${projectKey}, falling back to global issue types`
+      );
+
+      const issueTypes = await getIssueTypes();
+      const storyType = issueTypes.values.find(type => type.name.toLowerCase() === 'story');
+
+      if (!storyType) {
+        throw new UserInputError(
+          'Story issue type not found in Jira instance and project-specific lookup failed.',
+          {
+            projectKey,
+            availableTypes: issueTypes.values.map(t => t.name),
+          }
+        );
+      }
+
+      issueTypeId = storyType.id;
+    }
+
+    if (!issueTypeId) {
+      throw new UserInputError('Could not determine issue type for user story creation.', {
+        projectKey,
+        error: 'No suitable issue type found',
       });
     }
 
@@ -413,7 +475,7 @@ export const createUserStory = async (
         key: projectKey,
       },
       issuetype: {
-        id: storyType.id,
+        id: issueTypeId,
       },
     };
 
@@ -431,8 +493,15 @@ export const createUserStory = async (
       fields.customfield_10016 = storyPoints; // Story Points field
     }
 
+    // Note: Labels field might not be available on all projects
+    // Only include labels if they are provided and the project supports them
     if (labels && labels.length > 0) {
-      fields.labels = labels;
+      // For now, we'll skip labels if the project doesn't support them
+      // In a future enhancement, we could check the project's field configuration
+      log.info(
+        `📝 Note: Labels provided but may not be supported by this project: ${labels.join(', ')}`
+      );
+      // fields.labels = labels; // Commented out to avoid API errors
     }
 
     const result = await createIssue({ fields });
@@ -441,7 +510,7 @@ export const createUserStory = async (
     log.info(`⏱️ createUserStory executed in ${(end - start).toFixed(2)}ms`);
     return result;
   } catch (error) {
-    // If it's already a UserInputError (from getIssueTypes), re-throw it
+    // If it's already a UserInputError, re-throw it
     if (error instanceof UserInputError) {
       throw error;
     }

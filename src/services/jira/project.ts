@@ -376,19 +376,24 @@ export const createProjectWithBoard = async (
       // Import board service and filter service
       log.info(`📦 Importing board and filter services...`);
       const { createBoard } = await import('./board.js');
-      const { getOrCreateDefaultFilter } = await import('./filter.js');
+      const { createFilter } = await import('./filter.js');
       log.info(`✅ Services imported successfully`);
 
-      // Get or create a default filter for the board
-      log.info(`🔍 Getting or creating default filter...`);
-      const filterId = await getOrCreateDefaultFilter();
-      log.info(`✅ Filter ID obtained: ${filterId}`);
+      // Create a project-specific filter for the board
+      log.info(`🔍 Creating project-specific filter...`);
+      const projectFilter = await createFilter({
+        name: `${project.name} Board Filter`,
+        description: `Filter for ${project.name} board - shows all issues in this project`,
+        jql: `project = ${project.key} ORDER BY created DESC`,
+        favourite: false,
+      });
+      log.info(`✅ Project filter created: ${projectFilter.name} (ID: ${projectFilter.id})`);
 
-      // Create the board for the project
+      // Create the board for the project using the project-specific filter
       const boardInput = {
         name: boardName,
         type: boardType,
-        filterId: filterId,
+        filterId: parseInt(projectFilter.id),
         location: {
           type: 'project' as const,
           projectKeyOrId: project.key,
@@ -411,6 +416,7 @@ export const createProjectWithBoard = async (
 
       // If board creation fails, still return the project
       log.warn(`⚠️ Returning project without board due to board creation error`);
+      log.info(`💡 You can manually create a board later using the project key: ${project.key}`);
       return { project, board: null };
     }
   } catch (error) {

@@ -106,72 +106,121 @@ server.tool(
 
 // Project Management Tools
 
-// server.tool(
-//   'jira_create_project',
-//   {
-//     key: z.string(),
-//     name: z.string(),
-//     projectTypeKey: z.enum(['software', 'service_desk', 'business']),
-//     description: z.string().optional(),
-//     url: z.string().optional(),
-//     assigneeType: z.enum(['PROJECT_LEAD', 'UNASSIGNED']).optional(),
-//     boardName: z.string().optional(),
-//     boardType: z.enum(['scrum', 'kanban']).optional(),
-//   },
-//   async params => {
-//     log.info(`🔧 Tool 'jira_create_project' called with params: ${JSON.stringify(params)}`);
-//     try {
-//       log.info(`🔧 Creating project with automatic admin privileges...`);
+server.tool(
+  'jira_create_project',
+  {
+    key: z
+      .string()
+      .describe(
+        'Project key (must start with uppercase letter, only alphanumeric characters, no spaces or special characters)'
+      ),
+    name: z.string().describe('Project name'),
+    projectTypeKey: z
+      .enum(['software', 'service_desk', 'business'])
+      .describe('Type of project: software, service_desk, or business'),
+    description: z.string().optional().describe('Optional project description'),
+    url: z.string().optional().describe('Optional project URL'),
+    assigneeType: z
+      .enum(['PROJECT_LEAD', 'UNASSIGNED'])
+      .optional()
+      .describe('How issues are assigned: PROJECT_LEAD or UNASSIGNED'),
+    boardName: z
+      .string()
+      .optional()
+      .describe('Optional custom board name (defaults to "{ProjectName} Board")'),
+    boardType: z
+      .enum(['scrum', 'kanban'])
+      .optional()
+      .describe('Optional board type: scrum or kanban (defaults to scrum)'),
+  },
+  {
+    description:
+      'Create a new Jira project with an optional board. If no board parameters are provided, a default board will be created automatically. The project will have admin privileges.',
+    examples: [
+      {
+        name: 'Create Project with Default Board',
+        input: {
+          key: 'TEST',
+          name: 'Test Project',
+          projectTypeKey: 'software',
+          description: 'A test project',
+        },
+      },
+      {
+        name: 'Create Project with Custom Board',
+        input: {
+          key: 'WEBAPP',
+          name: 'Web Application',
+          projectTypeKey: 'software',
+          description: 'Modern web application',
+          boardName: 'Development Board',
+          boardType: 'scrum',
+        },
+      },
+    ],
+  },
+  async params => {
+    log.info(`🔧 Tool 'jira_create_project' called with params: ${JSON.stringify(params)}`);
+    try {
+      // Validate project key format
+      const projectKey = params['key'];
+      if (!/^[A-Z][A-Z0-9]*$/.test(projectKey)) {
+        throw new Error(
+          `Invalid project key "${projectKey}". Project keys must start with an uppercase letter and contain only uppercase alphanumeric characters (A-Z, 0-9). Examples: WEBAPP, TEST123, MYPROJECT`
+        );
+      }
 
-//       const input: projectService.CreateProjectInput = {
-//         key: params['key'],
-//         name: params['name'],
-//         projectTypeKey: params['projectTypeKey'],
-//         ...(params['description'] && { description: params['description'] }),
-//         ...(params['url'] && { url: params['url'] }),
-//         // Note: assigneeType and leadAccountId will be automatically set by the service
-//         // to ensure admin privileges for the current user
-//       };
+      log.info(`🔧 Creating project with automatic admin privileges...`);
 
-//       // Determine board name and type
-//       const boardName = params['boardName'] || `${params['name']} Board`;
-//       const boardType = params['boardType'] || 'scrum';
+      const input: projectService.CreateProjectInput = {
+        key: projectKey,
+        name: params['name'],
+        projectTypeKey: params['projectTypeKey'],
+        ...(params['description'] && { description: params['description'] }),
+        ...(params['url'] && { url: params['url'] }),
+        // Note: assigneeType and leadAccountId will be automatically set by the service
+        // to ensure admin privileges for the current user
+      };
 
-//       log.info(`🔧 Creating project with board: ${boardName} (${boardType})`);
+      // Determine board name and type
+      const boardName = params['boardName'] || `${params['name']} Board`;
+      const boardType = params['boardType'] || 'scrum';
 
-//       log.info(`📤 Sending to projectService.createProjectWithBoard: ${JSON.stringify(input)}`);
+      log.info(`🔧 Creating project with board: ${boardName} (${boardType})`);
 
-//       const result = await projectService.createProjectWithBoard(input, boardName, boardType);
-//       log.info(
-//         `✅ Created project with admin privileges: ${result.project.name} (Key: ${result.project.key})`
-//       );
+      log.info(`📤 Sending to projectService.createProjectWithBoard: ${JSON.stringify(input)}`);
 
-//       if (result.board) {
-//         log.info(`🎉 Board "${result.board.name}" (ID: ${result.board.id}) created successfully!`);
-//       } else {
-//         log.warn(`⚠️ Project created but board creation failed`);
-//       }
+      const result = await projectService.createProjectWithBoard(input, boardName, boardType);
+      log.info(
+        `✅ Created project with admin privileges: ${result.project.name} (Key: ${result.project.key})`
+      );
 
-//       log.info(`🎉 You now have FULL ADMIN PERMISSIONS for all operations in this project!`);
+      if (result.board) {
+        log.info(`🎉 Board "${result.board.name}" (ID: ${result.board.id}) created successfully!`);
+      } else {
+        log.warn(`⚠️ Project created but board creation failed`);
+      }
 
-//       return {
-//         content: [{ type: 'text', text: JSON.stringify(result, null, 2) }],
-//       };
-//     } catch (error) {
-//       log.error(`❌ Error in jira_create_project: ${error}`);
-//       if (error instanceof Error) {
-//         log.error(`❌ Error message: ${error.message}`);
-//         log.error(`❌ Error stack: ${error.stack}`);
+      log.info(`🎉 You now have FULL ADMIN PERMISSIONS for all operations in this project!`);
 
-//         // Add more detailed error information
-//         if ('context' in error && error.context) {
-//           log.error(`❌ Error context: ${JSON.stringify(error.context, null, 2)}`);
-//         }
-//       }
-//       throw error;
-//     }
-//   }
-// );
+      return {
+        content: [{ type: 'text', text: JSON.stringify(result, null, 2) }],
+      };
+    } catch (error) {
+      log.error(`❌ Error in jira_create_project: ${error}`);
+      if (error instanceof Error) {
+        log.error(`❌ Error message: ${error.message}`);
+        log.error(`❌ Error stack: ${error.stack}`);
+
+        // Add more detailed error information
+        if ('context' in error && error.context) {
+          log.error(`❌ Error context: ${JSON.stringify(error.context, null, 2)}`);
+        }
+      }
+      throw error;
+    }
+  }
+);
 
 server.tool(
   'jira_get_all_projects',
@@ -329,24 +378,71 @@ server.tool(
 server.tool(
   'jira_create_project_with_board',
   {
-    key: z.string(),
-    name: z.string(),
-    projectTypeKey: z.enum(['software', 'service_desk', 'business']),
-    description: z.string().optional(),
-    url: z.string().optional(),
-    assigneeType: z.enum(['PROJECT_LEAD', 'UNASSIGNED']).optional(),
-    boardName: z.string(),
-    boardType: z.enum(['scrum', 'kanban']),
+    key: z
+      .string()
+      .describe(
+        'Project key (must start with uppercase letter, only alphanumeric characters, no spaces or special characters)'
+      ),
+    name: z.string().describe('Project name'),
+    projectTypeKey: z
+      .enum(['software', 'service_desk', 'business'])
+      .describe('Type of project: software, service_desk, or business'),
+    description: z.string().optional().describe('Optional project description'),
+    url: z.string().optional().describe('Optional project URL'),
+    assigneeType: z
+      .enum(['PROJECT_LEAD', 'UNASSIGNED'])
+      .optional()
+      .describe('How issues are assigned: PROJECT_LEAD or UNASSIGNED'),
+    boardName: z.string().describe('Name for the board that will be created with the project'),
+    boardType: z
+      .enum(['scrum', 'kanban'])
+      .describe('Type of board: scrum (for sprints) or kanban (for continuous flow)'),
+  },
+  {
+    description:
+      'Create a new Jira project with an associated board. The project will have admin privileges and the board will be linked to the project. This is useful for setting up a complete project structure in one operation.',
+    examples: [
+      {
+        name: 'Create Software Project with Scrum Board',
+        input: {
+          key: 'WEBAPP',
+          name: 'Web Application',
+          projectTypeKey: 'software',
+          description: 'Modern web application development',
+          boardName: 'Development Board',
+          boardType: 'scrum',
+        },
+      },
+      {
+        name: 'Create Service Desk with Kanban Board',
+        input: {
+          key: 'SUPPORT',
+          name: 'Customer Support',
+          projectTypeKey: 'service_desk',
+          description: 'Customer support and ticket management',
+          boardName: 'Ticket Management',
+          boardType: 'kanban',
+        },
+      },
+    ],
   },
   async params => {
     log.info(
       `🔧 Tool 'jira_create_project_with_board' called with params: ${JSON.stringify(params)}`
     );
     try {
+      // Validate project key format
+      const projectKey = params['key'];
+      if (!/^[A-Z][A-Z0-9]*$/.test(projectKey)) {
+        throw new Error(
+          `Invalid project key "${projectKey}". Project keys must start with an uppercase letter and contain only uppercase alphanumeric characters (A-Z, 0-9). Examples: WEBAPP, TEST123, MYPROJECT`
+        );
+      }
+
       log.info(`🔧 Creating project with board and automatic admin privileges...`);
 
       const projectInput: projectService.CreateProjectInput = {
-        key: params['key'],
+        key: projectKey,
         name: params['name'],
         projectTypeKey: params['projectTypeKey'],
         ...(params['description'] && { description: params['description'] }),
