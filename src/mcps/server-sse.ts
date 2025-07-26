@@ -4,11 +4,11 @@ import { StreamableHTTPServerTransport } from '@modelcontextprotocol/sdk/server/
 import crypto from 'node:crypto';
 import http from 'node:http';
 import z from 'zod';
-import { Logger } from '../utils/log.js';
 import * as backlogService from '../services/jira/backlog.js';
 import * as boardService from '../services/jira/board.js';
 import * as filterService from '../services/jira/filter.js';
 import * as projectService from '../services/jira/project.js';
+import { Logger } from '../utils/log.js';
 
 // Import Jira services
 
@@ -104,19 +104,21 @@ server.tool(
     name: z.string(),
     projectTypeKey: z.enum(['software', 'service_desk', 'business']),
     description: z.string().optional(),
-    leadAccountId: z.string().optional(),
     url: z.string().optional(),
     assigneeType: z.enum(['PROJECT_LEAD', 'UNASSIGNED']).optional(),
   },
   async params => {
     log.info(`🔧 Tool 'jira_create_project' called with params: ${JSON.stringify(params)}`);
     try {
+      // Get current user to get the accountId
+      const currentUser = await projectService.getCurrentUser();
+
       const input: projectService.CreateProjectInput = {
         key: params['key'],
         name: params['name'],
         projectTypeKey: params['projectTypeKey'],
         ...(params['description'] && { description: params['description'] }),
-        ...(params['leadAccountId'] && { leadAccountId: params['leadAccountId'] }),
+        leadAccountId: currentUser.accountId, // Use the actual accountId
         ...(params['url'] && { url: params['url'] }),
         ...(params['assigneeType'] && { assigneeType: params['assigneeType'] }),
       };
@@ -133,6 +135,11 @@ server.tool(
       if (error instanceof Error) {
         log.error(`❌ Error message: ${error.message}`);
         log.error(`❌ Error stack: ${error.stack}`);
+
+        // Add more detailed error information
+        if ('context' in error && error.context) {
+          log.error(`❌ Error context: ${JSON.stringify(error.context, null, 2)}`);
+        }
       }
       throw error;
     }
@@ -188,6 +195,53 @@ server.tool(
     }
   }
 );
+
+server.tool(
+  'jira_check_project_exists',
+  {
+    projectKey: z.string(),
+  },
+  async params => {
+    log.info(`🔧 Tool 'jira_check_project_exists' called with params: ${JSON.stringify(params)}`);
+    try {
+      const result = await projectService.getProject(params['projectKey']);
+      log.info(`✅ Project exists: ${result.name} (Key: ${result.key})`);
+      return {
+        content: [
+          { type: 'text', text: JSON.stringify({ exists: true, project: result }, null, 2) },
+        ],
+      };
+    } catch (error) {
+      if (error instanceof Error && error.message.includes('not found')) {
+        log.info(`✅ Project does not exist: ${params['projectKey']}`);
+        return {
+          content: [
+            {
+              type: 'text',
+              text: JSON.stringify({ exists: false, projectKey: params['projectKey'] }, null, 2),
+            },
+          ],
+        };
+      }
+      log.error(`❌ Error in jira_check_project_exists: ${error}`);
+      throw error;
+    }
+  }
+);
+
+server.tool('jira_get_current_user', {}, async () => {
+  log.info(`🔧 Tool 'jira_get_current_user' called`);
+  try {
+    const result = await projectService.getCurrentUser();
+    log.info(`✅ Retrieved current user: ${result.displayName} (${result.emailAddress})`);
+    return {
+      content: [{ type: 'text', text: JSON.stringify(result, null, 2) }],
+    };
+  } catch (error) {
+    log.error(`❌ Error in jira_get_current_user: ${error}`);
+    throw error;
+  }
+});
 
 server.tool(
   'jira_update_project',
@@ -701,7 +755,7 @@ async function handleSSE(req: http.IncomingMessage, res: http.ServerResponse, ur
     await server.connect(transport);
     log.info(`✅ MCP server connected to SSE transport: ${transport.sessionId}`);
     log.info(
-      `📋 Available tools: jira_get_all_boards, jira_create_board, jira_get_board_by_id, jira_delete_board, jira_get_board_backlog, jira_get_board_epics, jira_get_board_sprints, jira_get_board_issues, jira_move_issues_to_board, jira_get_my_filters, jira_get_favourite_filters, jira_search_filters, jira_move_issues_to_backlog, jira_move_issues_to_backlog_for_board, jira_create_project, jira_get_all_projects, jira_get_project, jira_update_project, jira_delete_project, jira_create_project_with_board`
+      `📋 Available tools: jira_get_all_boards, jira_create_board, jira_get_board_by_id, jira_delete_board, jira_get_board_backlog, jira_get_board_epics, jira_get_board_sprints, jira_get_board_issues, jira_move_issues_to_board, jira_get_my_filters, jira_get_favourite_filters, jira_search_filters, jira_move_issues_to_backlog, jira_move_issues_to_backlog_for_board, jira_create_project, jira_get_all_projects, jira_get_project, jira_check_project_exists, jira_get_current_user, jira_update_project, jira_delete_project, jira_create_project_with_board`
     );
 
     res.on('close', () => {
