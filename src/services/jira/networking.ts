@@ -53,6 +53,9 @@ export const jiraApiEndpoint = {
     getProjectRole: '/rest/api/3/project/%s/role/%s',
     getProjectUsers: '/rest/api/3/project/%s/role/%s',
   },
+  user: {
+    getCurrentUser: '/rest/api/3/myself',
+  },
 };
 
 export const axiosClient = axios.create({

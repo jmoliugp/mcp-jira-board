@@ -371,3 +371,38 @@ export const createProjectWithBoard = async (
     throw new InternalServerError('Unexpected error in createProjectWithBoard.', context);
   }
 };
+
+/**
+ * Get current user information.
+ * @returns Current user details including accountId
+ */
+export const getCurrentUser = async (): Promise<{
+  accountId: string;
+  emailAddress: string;
+  displayName: string;
+  active: boolean;
+  timeZone: string;
+  accountType: string;
+}> => {
+  const start = performance.now();
+  try {
+    const { data } = await axiosClient.get(jiraApiEndpoint.user.getCurrentUser);
+    const end = performance.now();
+    log.info(`⏱️ getCurrentUser executed in ${(end - start).toFixed(2)}ms`);
+    return data;
+  } catch (error) {
+    const err = error as AxiosError;
+    const status = err.response?.status;
+    const data = err.response?.data;
+    const context = { status, data, endpoint: jiraApiEndpoint.user.getCurrentUser };
+
+    if (status === 400) throw new UserInputError('Invalid input for getCurrentUser.', context);
+    if (status === 401)
+      throw new AuthenticationError('Authentication failed for getCurrentUser.', context);
+    if (status === 403) throw new ForbiddenError('Access forbidden for getCurrentUser.', context);
+    if (status === 404) throw new NotFoundError('User not found.', context);
+    if (status && status >= 500)
+      throw new InternalServerError('Internal server error in getCurrentUser.', context);
+    throw new InternalServerError('Unexpected error in getCurrentUser.', context);
+  }
+};
