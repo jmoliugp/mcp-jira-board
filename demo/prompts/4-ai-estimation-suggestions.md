@@ -1,1 +1,1 @@
-Podrias estimar las stories sin estimar con AI?
+Podrias estimar las stories sin estimacion con AI?

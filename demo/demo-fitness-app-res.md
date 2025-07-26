@@ -1,3 +1,10 @@
+Dado el siguiente proyecto, asisteme:
+
+- Creando un nuevo proyecto en Jira.
+- Creando las stories principales.
+
+Aclaracion: Todo en ingles
+
 ## 📄 **Requirements Document — Fitness App Landing Page**
 
 **Project Name:** FitPulse Landing Page

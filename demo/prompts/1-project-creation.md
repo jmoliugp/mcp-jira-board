@@ -1,13 +1,14 @@
 Dado el siguiente proyecto, asisteme:
 
 - Creando un nuevo proyecto en Jira.
+- Kanban.
 - Creando las stories principales (Maximo 4).
 
 Aclaracion: Todo en ingles
 
 // Story Template
 
-**Description**  
+**Description** (DO NOT INCLUDE THIS HEADER)
 In natural language, explain what this story is about and why it's relevant to the project.
 
 **Acceptance Criteria**  

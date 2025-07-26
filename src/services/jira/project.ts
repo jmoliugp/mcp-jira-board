@@ -180,6 +180,20 @@ export const createProject = async (input: CreateProjectInput): Promise<CreatePr
     log.info(`✅ Project created with admin privileges: ${data.key} (${data.name})`);
     log.info(`🎉 You now have FULL ADMIN PERMISSIONS for all operations in this project!`);
 
+    // Debug: Log the full project response to understand the structure
+    log.info(
+      `🔍 Project response structure: ${JSON.stringify(
+        {
+          key: data.key,
+          name: data.name,
+          id: data.id,
+          projectTypeKey: data.projectTypeKey,
+        },
+        null,
+        2
+      )}`
+    );
+
     return data;
   } catch (error) {
     const err = error as AxiosError;
@@ -381,13 +395,58 @@ export const createProjectWithBoard = async (
 
       // Create a project-specific filter for the board
       log.info(`🔍 Creating project-specific filter...`);
-      const projectFilter = await createFilter({
-        name: `${project.name} Board Filter`,
-        description: `Filter for ${project.name} board - shows all issues in this project`,
-        jql: `project = ${project.key} ORDER BY created DESC`,
-        favourite: false,
-      });
-      log.info(`✅ Project filter created: ${projectFilter.name} (ID: ${projectFilter.id})`);
+
+      // Use the original project name from input if the response name is undefined
+      const projectName = project.name || projectInput.name;
+      log.info(
+        `🔍 Using project name for filter: "${projectName}" (response name: "${project.name}")`
+      );
+
+      // Try to create a unique filter name to avoid conflicts
+      const baseFilterName = `${projectName} Board Filter`;
+      let filterName = baseFilterName;
+      let projectFilter;
+
+      try {
+        projectFilter = await createFilter({
+          name: filterName,
+          description: `Filter for ${projectName} board - shows all issues in this project`,
+          jql: `project = ${project.key} ORDER BY created DESC`,
+          favourite: false,
+        });
+        log.info(`✅ Project filter created: ${projectFilter.name} (ID: ${projectFilter.id})`);
+      } catch (filterError) {
+        // If filter name already exists, try with a timestamp
+        const isNameConflict =
+          filterError instanceof Error &&
+          (filterError.message.includes('Filter with same name already exists') ||
+            (filterError as any).context?.data?.errors?.filterName?.includes('already exists'));
+
+        if (isNameConflict) {
+          log.warn(`⚠️ Filter name "${filterName}" already exists, trying with timestamp...`);
+          const timestamp = new Date().toISOString().replace(/[:.]/g, '-').slice(0, 19);
+          filterName = `${baseFilterName} (${timestamp})`;
+
+          projectFilter = await createFilter({
+            name: filterName,
+            description: `Filter for ${projectName} board - shows all issues in this project`,
+            jql: `project = ${project.key} ORDER BY created DESC`,
+            favourite: false,
+          });
+          log.info(
+            `✅ Project filter created with timestamp: ${projectFilter.name} (ID: ${projectFilter.id})`
+          );
+        } else {
+          // Log the full error context for debugging
+          log.error(`❌ Filter creation error: ${filterError}`);
+          if (filterError instanceof Error && 'context' in filterError) {
+            log.error(
+              `❌ Filter error context: ${JSON.stringify((filterError as any).context, null, 2)}`
+            );
+          }
+          throw filterError;
+        }
+      }
 
       // Create the board for the project using the project-specific filter
       const boardInput = {

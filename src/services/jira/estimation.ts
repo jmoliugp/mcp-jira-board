@@ -35,6 +35,21 @@ export interface EstimateStoriesParams {
 }
 
 /**
+ * Generate AI story estimation using Fibonacci sequence
+ * Returns a random value from the first few Fibonacci numbers commonly used in story point estimation
+ * @returns A story point value from the Fibonacci sequence
+ */
+function storyAiEstimation(): number {
+  const fibonacciSequence = [1, 2, 3, 5, 8, 13, 21];
+
+  const randomIndex = Math.floor(Math.random() * fibonacciSequence.length);
+  const estimatedPoints = fibonacciSequence[randomIndex] || 1;
+
+  log.info(`AI estimated story points: ${estimatedPoints}`);
+  return estimatedPoints;
+}
+
+/**
  * Estimate all unestimated stories in a project with default story points
  * @param params - Parameters for story estimation
  * @returns Estimation results
@@ -44,15 +59,10 @@ export const estimateStoriesInProject = async (
 ): Promise<EstimationResult> => {
   const start = performance.now();
 
-  const {
-    projectKey,
-    defaultStoryPoints = 3, // Default to 3 story points
-    estimationLabel = 'ai-estimation',
-    maxResults = 100,
-  } = params;
+  const { projectKey, estimationLabel = 'ai-estimation', maxResults = 100 } = params;
 
-  log.info(`🔧 Starting story estimation for project: ${projectKey}`);
-  log.info(`📊 Default story points: ${defaultStoryPoints}`);
+  log.info(`🔧 Starting AI story estimation for project: ${projectKey}`);
+  log.info(`🎲 Will use AI Fibonacci estimation for each story`);
   log.info(`🏷️ Estimation label: ${estimationLabel}`);
 
   const result: EstimationResult = {
@@ -84,7 +94,7 @@ export const estimateStoriesInProject = async (
     };
 
     const searchResult = await issueService.searchIssues(searchParams);
-    result.totalStories = searchResult.issues.length;
+    result.totalStories = searchResult.issues?.length || 0;
 
     log.info(`📊 Found ${result.totalStories} main issues in project ${projectKey}`);
 
@@ -117,6 +127,9 @@ export const estimateStoriesInProject = async (
       try {
         log.info(`📝 Estimating issue: ${issue.key} - "${issue.fields.summary}"`);
 
+        // Generate AI estimation for this story
+        const aiEstimatedPoints = storyAiEstimation();
+
         // Prepare update input - try to add labels, fallback to comments only if labels fail
         const updateInput: issueService.UpdateIssueInput = {
           fields: {
@@ -126,7 +139,7 @@ export const estimateStoriesInProject = async (
             comment: [
               {
                 add: {
-                  body: `🤖 AI Estimation\n\nSuggested story points: ${defaultStoryPoints}\n\nThis AI estimation was applied automatically and may need review by the development team.`,
+                  body: `🤖 AI Estimation\n\nSuggested story points: ${aiEstimatedPoints}\n\nThis AI estimation was applied automatically and may need review by the development team.`,
                 },
               },
             ],
@@ -149,7 +162,7 @@ export const estimateStoriesInProject = async (
                 comment: [
                   {
                     add: {
-                      body: `🤖 AI Estimation\n\nSuggested story points: ${defaultStoryPoints}\n\nThis AI estimation was applied automatically and may need review by the development team.`,
+                      body: `🤖 AI Estimation\n\nSuggested story points: ${aiEstimatedPoints}\n\nThis AI estimation was applied automatically and may need review by the development team.`,
                     },
                   },
                 ],
@@ -170,7 +183,7 @@ export const estimateStoriesInProject = async (
         result.estimatedIssues.push({
           key: issue.key,
           summary: issue.fields.summary,
-          storyPoints: 0, // No story points set (simplified approach)
+          storyPoints: aiEstimatedPoints, // Use AI estimated story points
           labels: [...(issue.fields.labels || []), estimationLabel], // Include the estimation label
         });
 

@@ -32,7 +32,7 @@ This project provides a Model Context Protocol (MCP) server that exposes Jira bo
 - **`jira_get_issue_types`** - Get all available issue types in Jira
 - **`jira_create_user_story`** - Create a user story in a project
 - **`jira_create_bug`** - Create a bug in a project
-- **`jira_create_issue`** - Create any type of issue with custom fields
+- **`jira_create_issue`** - Create any type of issue
 - **`jira_get_issue`** - Get issue details by key or ID
 - **`jira_delete_issue`** - Delete an issue by key or ID
 - **`jira_search_issues`** - Search for issues using JQL
