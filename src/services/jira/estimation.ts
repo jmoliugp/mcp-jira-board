@@ -4,6 +4,8 @@ import { performance } from 'perf_hooks';
 import { Logger } from '../../utils/log.js';
 import * as issueService from './issue.js';
 import * as projectService from './project.js';
+import * as customFieldService from './custom-field.js';
+import * as fieldConfigurationService from './field-configuration.js';
 
 const log = new Logger('jira/estimation');
 
@@ -70,84 +72,148 @@ export const estimateStoriesInProject = async (
     await projectService.getProject(projectKey);
     log.info(`✅ Project verified: ${projectKey}`);
 
-    // Search for all stories in the project
-    log.info(`🔍 Searching for stories in project: ${projectKey}`);
+    // Get or create a custom story points field
+    log.info(`🔧 Setting up custom story points field for project: ${projectKey}`);
+    let storyPointsFieldId: string | null = null;
+
+    try {
+      storyPointsFieldId = await customFieldService.getStoryPointsFieldId(
+        projectKey,
+        'AI Story Points'
+      );
+      log.info(`✅ Custom story points field ready: ${storyPointsFieldId}`);
+
+      // Try to configure the story points field in the project
+      log.info(`🔧 Attempting to configure story points field in project...`);
+      const configured = await fieldConfigurationService.configureStoryPointsField(projectKey);
+
+      if (configured) {
+        log.info(`✅ Story points field successfully configured in project ${projectKey}`);
+      } else {
+        log.info(`ℹ️ Story points field configuration not available - will use fallback mode`);
+      }
+    } catch (error) {
+      log.warn(`⚠️ Could not create custom story points field: ${error}`);
+      log.info(`💡 The tool will continue with labels and comments only`);
+      log.info(
+        `💡 This is normal if you don't have admin permissions or if custom fields are disabled`
+      );
+      storyPointsFieldId = null;
+    }
+
+    // Search for all main issues (not subtasks) in the project
+    log.info(`🔍 Searching for main issues in project: ${projectKey}`);
     const searchParams: issueService.SearchIssuesParams = {
-      jql: `project = ${projectKey} AND issuetype = Story ORDER BY created DESC`,
+      jql: `project = ${projectKey} AND issuetype != Sub-task ORDER BY created DESC`,
       maxResults,
-      fields: ['summary', 'description', 'labels', 'customfield_10016'], // Include story points field
+      fields: ['summary', 'description', 'labels', 'timeoriginalestimate', 'issuetype'], // Include original estimate field and issue type
     };
 
     const searchResult = await issueService.searchIssues(searchParams);
     result.totalStories = searchResult.issues.length;
 
-    log.info(`📊 Found ${result.totalStories} stories in project ${projectKey}`);
+    log.info(`📊 Found ${result.totalStories} main issues in project ${projectKey}`);
 
     if (result.totalStories === 0) {
-      log.info(`ℹ️ No stories found in project ${projectKey}`);
+      log.info(`ℹ️ No main issues found in project ${projectKey}`);
       return result;
     }
 
-    // Filter stories that don't have story points and don't already have the estimation label
-    const unestimatedStories = searchResult.issues.filter(issue => {
-      const storyPoints = issue.fields['customfield_10016'];
+    // Filter issues that don't have original estimate and don't already have the estimation label
+    const unestimatedIssues = searchResult.issues.filter(issue => {
+      const originalEstimate = issue.fields['timeoriginalestimate'];
       const labels = issue.fields.labels || [];
       const hasEstimationLabel = labels.includes(estimationLabel);
 
-      return !storyPoints && !hasEstimationLabel;
+      return !originalEstimate && !hasEstimationLabel;
     });
 
-    result.unestimatedStories = unestimatedStories.length;
-    log.info(`📊 Found ${result.unestimatedStories} unestimated stories`);
+    result.unestimatedStories = unestimatedIssues.length;
+    log.info(`📊 Found ${result.unestimatedStories} unestimated issues`);
 
     if (result.unestimatedStories === 0) {
-      log.info(`ℹ️ All stories are already estimated or have estimation label`);
+      log.info(`ℹ️ All issues are already estimated or have estimation label`);
       return result;
     }
 
-    // Estimate each unestimated story
-    log.info(`🚀 Starting estimation process for ${result.unestimatedStories} stories...`);
+    // Estimate each unestimated issue
+    log.info(`🚀 Starting estimation process for ${result.unestimatedStories} issues...`);
 
-    for (const story of unestimatedStories) {
+    for (const issue of unestimatedIssues) {
       try {
-        log.info(`📝 Estimating story: ${story.key} - "${story.fields.summary}"`);
+        log.info(`📝 Estimating issue: ${issue.key} - "${issue.fields.summary}"`);
 
-        // Prepare update input
+        // Prepare update input - start with just labels and comments
         const updateInput: issueService.UpdateIssueInput = {
           fields: {
-            customfield_10016: defaultStoryPoints, // Set story points
-            labels: [...(story.fields.labels || []), estimationLabel], // Add estimation label
+            labels: [...(issue.fields.labels || []), estimationLabel], // Add estimation label
           },
           update: {
             comment: [
               {
                 add: {
-                  body: `🤖 **AI Estimation Applied**\n\nStory points set to **${defaultStoryPoints}** by automatic estimation system.\n\n*This estimation was applied automatically and may need review by the development team.*`,
+                  body: `🤖 **AI Estimation Applied**\n\nEstimated story points: **${defaultStoryPoints}**\n\n*This AI estimation was applied automatically and may need review by the development team.*`,
                 },
               },
             ],
           },
         };
 
-        // Update the issue
-        await issueService.updateIssue(story.key, updateInput);
+        // Try to update the issue with custom story points field
+        let estimateSet = false;
+        if (storyPointsFieldId) {
+          try {
+            const updateWithStoryPoints: issueService.UpdateIssueInput = {
+              fields: {
+                [storyPointsFieldId]: defaultStoryPoints, // Use custom field ID
+                labels: [...(issue.fields.labels || []), estimationLabel],
+              },
+              update: {
+                comment: [
+                  {
+                    add: {
+                      body: `🤖 **AI Estimation Applied**\n\nStory points set to **${defaultStoryPoints}** by AI-powered automatic estimation system.\n\n*This AI estimation was applied automatically and may need review by the development team.*`,
+                    },
+                  },
+                ],
+              },
+            };
+
+            await issueService.updateIssue(issue.key, updateWithStoryPoints);
+            estimateSet = true;
+            log.info(
+              `✅ Successfully estimated ${issue.key} with ${defaultStoryPoints} story points`
+            );
+          } catch (estimateError) {
+            // If custom field is not available, try without it
+            log.warn(
+              `⚠️ Custom story points field not available for ${issue.key}, trying without estimate`
+            );
+
+            await issueService.updateIssue(issue.key, updateInput);
+            log.info(`✅ Successfully estimated ${issue.key} (labels and comments only)`);
+          }
+        } else {
+          // No custom field available, use labels and comments only
+          await issueService.updateIssue(issue.key, updateInput);
+          log.info(`✅ Successfully estimated ${issue.key} (labels and comments only)`);
+        }
 
         // Add to successful estimations
         result.estimatedIssues.push({
-          key: story.key,
-          summary: story.fields.summary,
-          storyPoints: defaultStoryPoints,
-          labels: [...(story.fields.labels || []), estimationLabel],
+          key: issue.key,
+          summary: issue.fields.summary,
+          storyPoints: estimateSet ? defaultStoryPoints : 0,
+          labels: [...(issue.fields.labels || []), estimationLabel],
         });
 
         result.estimatedStories++;
-        log.info(`✅ Successfully estimated ${story.key} with ${defaultStoryPoints} story points`);
       } catch (error) {
-        log.error(`❌ Failed to estimate story ${story.key}: ${error}`);
+        log.error(`❌ Failed to estimate issue ${issue.key}: ${error}`);
 
         result.failedIssues.push({
-          key: story.key,
-          summary: story.fields.summary,
+          key: issue.key,
+          summary: issue.fields.summary,
           error: error instanceof Error ? error.message : String(error),
         });
 
@@ -156,10 +222,10 @@ export const estimateStoriesInProject = async (
     }
 
     const end = performance.now();
-    log.info(`⏱️ Story estimation completed in ${(end - start).toFixed(2)}ms`);
+    log.info(`⏱️ Issue estimation completed in ${(end - start).toFixed(2)}ms`);
     log.info(`📊 Estimation Summary:`);
-    log.info(`   - Total stories: ${result.totalStories}`);
-    log.info(`   - Unestimated stories: ${result.unestimatedStories}`);
+    log.info(`   - Total issues: ${result.totalStories}`);
+    log.info(`   - Unestimated issues: ${result.unestimatedStories}`);
     log.info(`   - Successfully estimated: ${result.estimatedStories}`);
     log.info(`   - Failed estimations: ${result.failedEstimations}`);
 
@@ -192,26 +258,28 @@ export const getProjectEstimationStats = async (
   log.info(`📊 Getting estimation statistics for project: ${projectKey}`);
 
   try {
-    // Search for all stories in the project
+    // Search for all main issues (not subtasks) in the project
     const searchParams: issueService.SearchIssuesParams = {
-      jql: `project = ${projectKey} AND issuetype = Story`,
-      maxResults: 1000, // Get all stories for accurate stats
-      fields: ['summary', 'labels', 'customfield_10016'],
+      jql: `project = ${projectKey} AND issuetype != Sub-task`,
+      maxResults: 1000, // Get all issues for accurate stats
+      fields: ['summary', 'labels', 'timeoriginalestimate', 'issuetype'],
     };
 
     const searchResult = await issueService.searchIssues(searchParams);
-    const stories = searchResult.issues;
+    const issues = searchResult.issues;
 
     let estimatedStories = 0;
     let totalStoryPoints = 0;
     let aiEstimatedStories = 0;
 
-    for (const story of stories) {
-      const storyPoints = story.fields['customfield_10016'];
-      const labels = story.fields.labels || [];
+    for (const issue of issues) {
+      const originalEstimate = issue.fields['timeoriginalestimate'];
+      const labels = issue.fields.labels || [];
 
-      if (storyPoints) {
+      if (originalEstimate) {
         estimatedStories++;
+        // Convert milliseconds to story points (1 hour = 1 story point)
+        const storyPoints = Math.round(originalEstimate / 3600000);
         totalStoryPoints += storyPoints;
 
         if (labels.includes('ai-estimation')) {
@@ -220,12 +288,12 @@ export const getProjectEstimationStats = async (
       }
     }
 
-    const unestimatedStories = stories.length - estimatedStories;
+    const unestimatedStories = issues.length - estimatedStories;
     const averageStoryPoints = estimatedStories > 0 ? totalStoryPoints / estimatedStories : 0;
 
     const stats = {
       projectKey,
-      totalStories: stories.length,
+      totalStories: issues.length,
       estimatedStories,
       unestimatedStories,
       aiEstimatedStories,

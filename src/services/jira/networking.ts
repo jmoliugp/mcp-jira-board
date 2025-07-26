@@ -52,6 +52,9 @@ export const jiraApiEndpoint = {
     getProjectRoles: '/rest/api/3/project/%s/role',
     getProjectRole: '/rest/api/3/project/%s/role/%s',
     getProjectUsers: '/rest/api/3/project/%s/role/%s',
+    getProjectFieldConfiguration: '/rest/api/3/fieldconfiguration/project/%s',
+    getProjectScreenSchemes: '/rest/api/3/screenscheme/project/%s',
+    getProjectFieldConfigurationSchemes: '/rest/api/3/fieldconfigurationscheme/project/%s',
   },
   user: {
     getCurrentUser: '/rest/api/3/myself',
@@ -65,6 +68,13 @@ export const jiraApiEndpoint = {
     getIssueTypes: '/rest/api/3/issuetype',
     getIssueType: '/rest/api/3/issuetype/%s',
     getIssueTransitions: '/rest/api/3/issue/%s/transitions',
+  },
+  field: {
+    getFields: '/rest/api/3/field',
+    createCustomField: '/rest/api/3/field',
+    getField: '/rest/api/3/field/%s',
+    updateField: '/rest/api/3/field/%s',
+    deleteField: '/rest/api/3/field/%s',
   },
 };
 

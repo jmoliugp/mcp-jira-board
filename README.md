@@ -187,6 +187,11 @@ The MCP server supports two transport modes:
 - `jira_delete_issue`: Delete an issue by key or ID
 - `jira_search_issues`: Search for issues using JQL
 
+### AI Story Estimation
+
+- `jira_ai_estimate_stories_in_project`: AI-powered automatic estimation of unestimated stories with default story points
+- `jira_get_project_ai_estimation_stats`: Get AI estimation statistics for a project
+
 ### Board Operations
 
 - `jira_get_board_backlog`: Get issues in board backlog
@@ -247,6 +252,67 @@ const result = await jira_update_issue({
 });
 ```
 
+### AI Story Estimation
+
+```typescript
+// AI-estimate all unestimated stories in a project with default 3 story points
+const result = await jira_ai_estimate_stories_in_project({
+  projectKey: 'FITPULSE',
+});
+
+// AI-estimate with custom story points and label
+const result = await jira_ai_estimate_stories_in_project({
+  projectKey: 'FITPULSE',
+  defaultStoryPoints: 5,
+  estimationLabel: 'ai-estimated',
+});
+
+// Get AI estimation statistics for a project
+const stats = await jira_get_project_ai_estimation_stats({
+  projectKey: 'FITPULSE',
+});
+```
+
+### Field Configuration
+
+```typescript
+// Check if Original Estimate field is enabled in a project
+const fieldCheck = await jira_check_field_configuration({
+  projectKey: 'FITPULSE',
+  fieldId: 'timeoriginalestimate',
+});
+
+// Attempt to enable Original Estimate field in a project
+const enableResult = await jira_attempt_enable_field({
+  projectKey: 'FITPULSE',
+  fieldId: 'timeoriginalestimate',
+});
+```
+
+### Custom Fields
+
+```typescript
+// Create a custom story points field
+const customField = await jira_create_custom_field({
+  name: 'AI Story Points',
+  description: 'Story points for AI-powered estimation',
+  type: 'com.atlassian.jira.plugin.system.customfieldtypes:number',
+});
+
+// Find an existing custom field
+const field = await jira_find_custom_field({
+  fieldName: 'AI Story Points',
+});
+
+// Ensure a story points field exists for a project
+const storyPointsField = await jira_ensure_story_points_field({
+  projectKey: 'FITPULSE',
+  fieldName: 'AI Story Points',
+});
+```
+
+````
+
 ## Troubleshooting
 
 ### Common Issues
@@ -267,7 +333,7 @@ curl http://localhost:3001/sse
 
 # Check environment variables
 pnpm docker:status
-```
+````
 
 ## Development
 

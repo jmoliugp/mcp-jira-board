@@ -10,6 +10,8 @@ import * as filterService from '../services/jira/filter.js';
 import * as projectService from '../services/jira/project.js';
 import * as issueService from '../services/jira/issue.js';
 import * as estimationService from '../services/jira/estimation.js';
+import * as fieldConfigurationService from '../services/jira/field-configuration.js';
+import * as customFieldService from '../services/jira/custom-field.js';
 import { Logger } from '../utils/log.js';
 
 // Import Jira services
@@ -1548,6 +1550,286 @@ server.tool(
   }
 );
 
+// Field Configuration Tools
+
+server.tool(
+  'jira_check_field_configuration',
+  {
+    projectKey: z
+      .string()
+      .describe('The project key (e.g., "FITPULSE") to check field configuration for'),
+    fieldId: z
+      .string()
+      .describe('The field ID to check (e.g., "timeoriginalestimate", "customfield_10016")'),
+  },
+  {
+    description:
+      "Check if a specific field is enabled in a project's field configuration. This is useful for understanding which fields are available for use in issue creation and updates.",
+    examples: [
+      {
+        name: 'Check Original Estimate Field',
+        input: {
+          projectKey: 'FITPULSE',
+          fieldId: 'timeoriginalestimate',
+        },
+      },
+      {
+        name: 'Check Story Points Field',
+        input: {
+          projectKey: 'FITPULSE',
+          fieldId: 'customfield_10016',
+        },
+      },
+    ],
+  },
+  async params => {
+    log.info(
+      `🔧 Tool 'jira_check_field_configuration' called with params: ${JSON.stringify(params)}`
+    );
+    try {
+      const isEnabled = await fieldConfigurationService.isFieldEnabledInProject(
+        params['projectKey'],
+        params['fieldId']
+      );
+
+      const result = {
+        projectKey: params['projectKey'],
+        fieldId: params['fieldId'],
+        isEnabled,
+        message: isEnabled
+          ? `Field '${params['fieldId']}' is enabled in project ${params['projectKey']}`
+          : `Field '${params['fieldId']}' is not enabled in project ${params['projectKey']}`,
+      };
+
+      log.info(`📊 Field configuration check completed: ${result.message}`);
+
+      return {
+        content: [{ type: 'text', text: JSON.stringify(result, null, 2) }],
+      };
+    } catch (error) {
+      log.error(`❌ Error in jira_check_field_configuration: ${error}`);
+      throw error;
+    }
+  }
+);
+
+server.tool(
+  'jira_attempt_enable_field',
+  {
+    projectKey: z.string().describe('The project key (e.g., "FITPULSE") to enable the field in'),
+    fieldId: z
+      .string()
+      .describe('The field ID to enable (e.g., "timeoriginalestimate", "customfield_10016")'),
+  },
+  {
+    description:
+      "Attempt to enable a specific field in a project's field configuration. This requires admin permissions and may not work in all Jira instances. If automatic enabling fails, manual configuration in Jira settings may be required.",
+    examples: [
+      {
+        name: 'Enable Original Estimate Field',
+        input: {
+          projectKey: 'FITPULSE',
+          fieldId: 'timeoriginalestimate',
+        },
+      },
+      {
+        name: 'Enable Story Points Field',
+        input: {
+          projectKey: 'FITPULSE',
+          fieldId: 'customfield_10016',
+        },
+      },
+    ],
+  },
+  async params => {
+    log.info(`🔧 Tool 'jira_attempt_enable_field' called with params: ${JSON.stringify(params)}`);
+    try {
+      const enabled = await fieldConfigurationService.attemptToEnableFieldInProject(
+        params['projectKey'],
+        params['fieldId']
+      );
+
+      const result = {
+        projectKey: params['projectKey'],
+        fieldId: params['fieldId'],
+        enabled,
+        message: enabled
+          ? `Field '${params['fieldId']}' was successfully enabled in project ${params['projectKey']}`
+          : `Field '${params['fieldId']}' could not be automatically enabled in project ${params['projectKey']}. Manual configuration may be required.`,
+      };
+
+      log.info(`🔧 Field enable attempt completed: ${result.message}`);
+
+      return {
+        content: [{ type: 'text', text: JSON.stringify(result, null, 2) }],
+      };
+    } catch (error) {
+      log.error(`❌ Error in jira_attempt_enable_field: ${error}`);
+      throw error;
+    }
+  }
+);
+
+// Custom Field Tools
+
+server.tool(
+  'jira_create_custom_field',
+  {
+    name: z.string().describe('The name for the custom field'),
+    description: z.string().optional().describe('Optional description for the field'),
+    type: z
+      .enum([
+        'com.atlassian.jira.plugin.system.customfieldtypes:number',
+        'com.atlassian.jira.plugin.system.customfieldtypes:textfield',
+        'com.atlassian.jira.plugin.system.customfieldtypes:textarea',
+      ])
+      .describe('The type of custom field to create'),
+  },
+  {
+    description:
+      'Create a custom field in Jira. This is useful for adding project-specific fields like custom story points, priority levels, or other tracking fields.',
+    examples: [
+      {
+        name: 'Create Custom Story Points Field',
+        input: {
+          name: 'AI Story Points',
+          description: 'Story points for AI-powered estimation',
+          type: 'com.atlassian.jira.plugin.system.customfieldtypes:number',
+        },
+      },
+      {
+        name: 'Create Custom Priority Field',
+        input: {
+          name: 'AI Priority',
+          description: 'AI-determined priority level',
+          type: 'com.atlassian.jira.plugin.system.customfieldtypes:textfield',
+        },
+      },
+    ],
+  },
+  async params => {
+    log.info(`🔧 Tool 'jira_create_custom_field' called with params: ${JSON.stringify(params)}`);
+    try {
+      const field = await customFieldService.createCustomField({
+        name: params['name'],
+        ...(params['description'] && { description: params['description'] }),
+        type: params['type'],
+      });
+
+      const result = {
+        fieldId: field.id,
+        fieldName: field.name,
+        custom: field.custom,
+        message: `Custom field '${field.name}' created successfully with ID: ${field.id}`,
+      };
+
+      log.info(`✅ Custom field created: ${result.message}`);
+
+      return {
+        content: [{ type: 'text', text: JSON.stringify(result, null, 2) }],
+      };
+    } catch (error) {
+      log.error(`❌ Error in jira_create_custom_field: ${error}`);
+      throw error;
+    }
+  }
+);
+
+server.tool(
+  'jira_find_custom_field',
+  {
+    fieldName: z.string().describe('The name of the custom field to find'),
+  },
+  {
+    description:
+      'Find a custom field by name. This is useful for locating existing custom fields before using them in issue updates.',
+    examples: [
+      {
+        name: 'Find AI Story Points Field',
+        input: {
+          fieldName: 'AI Story Points',
+        },
+      },
+    ],
+  },
+  async params => {
+    log.info(`🔧 Tool 'jira_find_custom_field' called with params: ${JSON.stringify(params)}`);
+    try {
+      const field = await customFieldService.findCustomFieldByName(params['fieldName']);
+
+      const result = {
+        found: !!field,
+        fieldId: field?.id || null,
+        fieldName: field?.name || null,
+        custom: field?.custom || false,
+        message: field
+          ? `Custom field '${field.name}' found with ID: ${field.id}`
+          : `Custom field '${params['fieldName']}' not found`,
+      };
+
+      log.info(`🔍 Custom field search completed: ${result.message}`);
+
+      return {
+        content: [{ type: 'text', text: JSON.stringify(result, null, 2) }],
+      };
+    } catch (error) {
+      log.error(`❌ Error in jira_find_custom_field: ${error}`);
+      throw error;
+    }
+  }
+);
+
+server.tool(
+  'jira_ensure_story_points_field',
+  {
+    projectKey: z.string().describe('The project key (e.g., "FITPULSE")'),
+    fieldName: z
+      .string()
+      .optional()
+      .describe('The name for the story points field (defaults to "AI Story Points")'),
+  },
+  {
+    description:
+      "Ensure a custom story points field exists for a project. This will create the field if it doesn't exist, or return the existing field ID if it does. This is useful for setting up AI estimation capabilities.",
+    examples: [
+      {
+        name: 'Ensure AI Story Points Field',
+        input: {
+          projectKey: 'FITPULSE',
+          fieldName: 'AI Story Points',
+        },
+      },
+    ],
+  },
+  async params => {
+    log.info(
+      `🔧 Tool 'jira_ensure_story_points_field' called with params: ${JSON.stringify(params)}`
+    );
+    try {
+      const fieldId = await customFieldService.getStoryPointsFieldId(
+        params['projectKey'],
+        params['fieldName'] || 'AI Story Points'
+      );
+
+      const result = {
+        projectKey: params['projectKey'],
+        fieldName: params['fieldName'] || 'AI Story Points',
+        fieldId,
+        message: `Story points field '${params['fieldName'] || 'AI Story Points'}' ready for project ${params['projectKey']} with ID: ${fieldId}`,
+      };
+
+      log.info(`✅ Story points field ensured: ${result.message}`);
+
+      return {
+        content: [{ type: 'text', text: JSON.stringify(result, null, 2) }],
+      };
+    } catch (error) {
+      log.error(`❌ Error in jira_ensure_story_points_field: ${error}`);
+      throw error;
+    }
+  }
+);
+
 // Board Resources
 
 server.registerResource(
@@ -1661,7 +1943,7 @@ async function handleSSE(req: http.IncomingMessage, res: http.ServerResponse, ur
     await server.connect(transport);
     log.info(`✅ MCP server connected to SSE transport: ${transport.sessionId}`);
     log.info(
-      `📋 Available tools: jira_get_all_boards, jira_create_board, jira_get_board_by_id, jira_delete_board, jira_get_board_backlog, jira_get_board_epics, jira_get_board_sprints, jira_get_board_issues, jira_move_issues_to_board, jira_get_my_filters, jira_get_favourite_filters, jira_search_filters, jira_move_issues_to_backlog, jira_move_issues_to_backlog_for_board, jira_create_project, jira_get_all_projects, jira_get_project, jira_check_project_exists, jira_get_current_user, jira_update_project, jira_delete_project, jira_create_project_with_board, jira_get_issue_types, jira_get_project_issue_types, jira_create_user_story, jira_create_bug, jira_create_issue, jira_get_issue, jira_search_issues, jira_delete_issue, jira_get_issue_transitions, jira_update_issue, jira_ai_estimate_stories_in_project, jira_get_project_ai_estimation_stats`
+      `📋 Available tools: jira_get_all_boards, jira_create_board, jira_get_board_by_id, jira_delete_board, jira_get_board_backlog, jira_get_board_epics, jira_get_board_sprints, jira_get_board_issues, jira_move_issues_to_board, jira_get_my_filters, jira_get_favourite_filters, jira_search_filters, jira_move_issues_to_backlog, jira_move_issues_to_backlog_for_board, jira_create_project, jira_get_all_projects, jira_get_project, jira_check_project_exists, jira_get_current_user, jira_update_project, jira_delete_project, jira_create_project_with_board, jira_get_issue_types, jira_get_project_issue_types, jira_create_user_story, jira_create_bug, jira_create_issue, jira_get_issue, jira_search_issues, jira_delete_issue, jira_get_issue_transitions, jira_update_issue, jira_ai_estimate_stories_in_project, jira_get_project_ai_estimation_stats, jira_check_field_configuration, jira_attempt_enable_field, jira_create_custom_field, jira_find_custom_field, jira_ensure_story_points_field`
     );
 
     res.on('close', () => {
