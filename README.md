@@ -7,17 +7,21 @@ A Model Context Protocol (MCP) server that provides Jira board management functi
 ### 1. Setup with Docker (Recommended)
 
 ```bash
-# Setup everything automatically
-pnpm docker:setup
+# Setup everything automatically (build, test, create .env)
+pnpm docker:build
 
 # Or manually:
-pnpm docker:build
 pnpm docker:test
 ```
 
 ### 2. Configure Environment Variables
 
-Create a `.env` file or set environment variables:
+Create a `.env` file or set environment variables. The scripts will automatically look for the `.env` file in:
+
+- Current directory (`./.env`)
+- Parent directory (`../.env`)
+
+You can create the `.env` file manually or use the setup script:
 
 ```bash
 export JIRA_BASE_URL=https://your-domain.atlassian.net
@@ -40,12 +44,12 @@ export OPENAI_API_KEY=your-openai-api-key
 
 | Command                    | Description                               |
 | -------------------------- | ----------------------------------------- |
-| `pnpm docker:setup`        | Complete setup (build, test, create .env) |
-| `pnpm docker:build`        | Build Docker image                        |
+| `pnpm docker:build`        | Complete setup (build, test, create .env) |
 | `pnpm docker:test`         | Test Docker container                     |
 | `pnpm docker:status`       | Check Docker status and environment       |
 | `pnpm docker:start`        | Run MCP server directly                   |
 | `pnpm docker:run`          | Run container with current env vars       |
+| `pnpm docker:load-env`     | Load environment variables from .env      |
 | `pnpm docker:compose:up`   | Start with docker-compose                 |
 | `pnpm docker:compose:down` | Stop docker-compose                       |
 | `pnpm docker:compose:logs` | View docker-compose logs                  |
@@ -116,8 +120,8 @@ export OPENAI_API_KEY=your-openai-api-key
 ### Quick Start
 
 ```bash
-# Setup everything
-pnpm docker:setup
+# Setup everything (build, test, create .env)
+pnpm docker:build
 
 # Check status
 pnpm docker:status
@@ -217,6 +221,9 @@ pnpm mcp:test
 ```bash
 # Check Docker status
 pnpm docker:status
+
+# Load environment variables
+pnpm docker:load-env
 
 # View container logs
 pnpm docker:compose:logs

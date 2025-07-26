@@ -6,6 +6,27 @@ set -e
 
 echo "🚀 Starting Jira MCP Server..."
 
+# Load environment variables directly from .env file
+if [ -f .env ]; then
+    echo "📄 Loading environment from: .env"
+    # Read variables directly from .env file
+    JIRA_BASE_URL=$(grep "^JIRA_BASE_URL=" .env | cut -d'=' -f2-)
+    JIRA_EMAIL=$(grep "^JIRA_EMAIL=" .env | cut -d'=' -f2-)
+    JIRA_API_TOKEN=$(grep "^JIRA_API_TOKEN=" .env | cut -d'=' -f2-)
+    OPENAI_API_KEY=$(grep "^OPENAI_API_KEY=" .env | cut -d'=' -f2-)
+    echo "✅ Environment loaded from current directory"
+elif [ -f ../.env ]; then
+    echo "📄 Loading environment from: ../.env"
+    # Read variables directly from parent .env file
+    JIRA_BASE_URL=$(grep "^JIRA_BASE_URL=" ../.env | cut -d'=' -f2-)
+    JIRA_EMAIL=$(grep "^JIRA_EMAIL=" ../.env | cut -d'=' -f2-)
+    JIRA_API_TOKEN=$(grep "^JIRA_API_TOKEN=" ../.env | cut -d'=' -f2-)
+    OPENAI_API_KEY=$(grep "^OPENAI_API_KEY=" ../.env | cut -d'=' -f2-)
+    echo "✅ Environment loaded from parent directory"
+else
+    echo "⚠️  No .env file found"
+fi
+
 # Check if environment variables are set
 if [ -z "$JIRA_BASE_URL" ] || [ -z "$JIRA_EMAIL" ] || [ -z "$JIRA_API_TOKEN" ]; then
     echo "❌ Required environment variables not set"

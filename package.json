@@ -30,9 +30,9 @@
     "docker:clean": "docker rmi jira-mcp-server:latest",
     "docker:rebuild": "pnpm docker:clean && pnpm docker:build",
     "docker:dev": "docker-compose up --build",
-    "docker:setup": "./scripts/setup-docker.sh",
     "docker:status": "./scripts/docker-status.sh",
-    "docker:start": "./scripts/run-mcp.sh"
+    "docker:start": "./scripts/run-mcp.sh",
+    "docker:load-env": "./scripts/load-env.sh"
   },
   "keywords": [
     "typescript",
